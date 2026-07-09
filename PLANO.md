@@ -230,6 +230,14 @@ Adaptadores de IA: **reaproveitar do Mythquill** (Gemini + OpenAI-compatible). S
 - [x] Narrativa da Purah via Gemini BYOK (gemini-2.5-flash, chave persistida no browser, EN/PT) — opcional, planner funciona sem (2026-07-09) ⚠️ não testado com chave real
 - [ ] Planner v2: considerar densidade/clusters e travessia entre camadas; usar quests pendentes no plano
 
+### Redesign pós-review (2026-07-09) ✅
+- [x] Shell responsivo de verdade: sidebar desktop (lg+) + bottom nav mobile preservada
+- [x] Dashboard rico: anel hero animado c/ glow, radial multi-camada "o que falta", donut de quests com tabela de legenda, cor/ícone por categoria (lib/categoryMeta.ts)
+- [x] Tracker em tabela (nome | barra | contagem | %), divisórias finas
+- [x] Mapa: ícones reais (zd-icons, ≤250 itens/categoria; koroks/locations em canvas), painel filtro+legenda com pendentes por camada
+- [x] Companion → chat da Purah: intent local + Gemini opcional (frases livres); planos determinísticos em cascata — coleta (rota otimizada) e upgrade de armadura 4★ (materiais/nível × estoque do save, baú no mapa). "A IA não surta": LLM só interpreta e narra
+- [ ] Pendente do review: narração/intent com chave Gemini real (não testado); ícones de materiais individuais nos cards (hoje ícone genérico)
+
 ### F6 — Polish e lançamento
 - [ ] Passe de identidade visual completo, animações, empty states
 - [ ] Guia de extração de save, créditos/disclaimers, README bilíngue
