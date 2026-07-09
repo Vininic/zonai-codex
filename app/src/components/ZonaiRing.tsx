@@ -4,13 +4,15 @@ interface ZonaiRingProps {
   /** texto central (default: percentual) */
   value?: string
   sublabel?: string
+  /** modo hero: glow forte + anel de ticks girando lentamente */
+  hero?: boolean
 }
 
 /**
  * Anel de progresso Zonai: anel externo de ticks (runa), arco de progresso
  * jade com glow; vira dourado ao atingir 100%.
  */
-export function ZonaiRing({ fraction, size = 200, value, sublabel }: ZonaiRingProps) {
+export function ZonaiRing({ fraction, size = 200, value, sublabel, hero = false }: ZonaiRingProps) {
   const complete = fraction >= 1
   const color = complete ? 'var(--color-gold)' : 'var(--color-jade)'
   const r = 42
@@ -41,7 +43,24 @@ export function ZonaiRing({ fraction, size = 200, value, sublabel }: ZonaiRingPr
   return (
     <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
       <svg viewBox="0 0 100 100" width={size} height={size} role="img" aria-label={display}>
-        {ticks}
+        <g className={hero ? 'zonai-spin' : undefined} style={{ transformOrigin: '50px 50px' }}>
+          {ticks}
+        </g>
+        {hero && (
+          <circle
+            cx="50"
+            cy="50"
+            r={r}
+            fill="none"
+            stroke={color}
+            strokeWidth="7"
+            opacity="0.12"
+            style={{ filter: `blur(3px)` }}
+            strokeDasharray={circumference}
+            strokeDashoffset={circumference * (1 - pct)}
+            transform="rotate(-90 50 50)"
+          />
+        )}
         <circle cx="50" cy="50" r={r} fill="none" stroke="var(--color-edge)" strokeWidth="1.4" />
         <circle
           cx="50"
@@ -62,7 +81,11 @@ export function ZonaiRing({ fraction, size = 200, value, sublabel }: ZonaiRingPr
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
         <span
           className="font-display leading-none"
-          style={{ fontSize: size * 0.17, color: complete ? 'var(--color-gold)' : 'var(--color-ink)' }}
+          style={{
+            fontSize: size * 0.17,
+            color: complete ? 'var(--color-gold)' : 'var(--color-ink)',
+            textShadow: hero ? `0 0 18px ${complete ? 'rgba(217,185,106,.5)' : 'rgba(87,230,192,.45)'}` : undefined,
+          }}
         >
           {display}
         </span>

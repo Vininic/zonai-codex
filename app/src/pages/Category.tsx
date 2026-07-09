@@ -47,7 +47,7 @@ export function Category() {
   const doneCount = group.items.filter((i) => manualSet[i.id] || saveSet[i.id]).length
 
   return (
-    <div>
+    <div className="mx-auto max-w-3xl">
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <h2 className="font-display text-lg">
           <Link to="/tracker" className="text-ink-faint">

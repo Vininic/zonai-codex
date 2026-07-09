@@ -96,6 +96,23 @@ body::before {
   transform: scale(0.95);
 }
 
+/* markers de ícone no mapa */
+.marker-done {
+  opacity: 0.42;
+  filter: grayscale(0.35);
+}
+.marker-pending {
+  filter: drop-shadow(0 0 4px rgba(87, 230, 192, 0.7));
+}
+
+/* rotação lenta do anel de ticks (modo hero) */
+.zonai-spin {
+  animation: zonai-spin 60s linear infinite;
+}
+@keyframes zonai-spin {
+  to { transform: rotate(360deg); }
+}
+
 .rune-pulse {
   animation: rune-pulse 0.45s ease-out;
 }

@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css'
 import { useTranslation } from 'react-i18next'
 import { useDataset } from '../lib/useDataset'
 import { itemLabel } from '../lib/itemLabel'
+import { categoryMeta, ICON_MARKER_MAX_ITEMS } from '../lib/categoryMeta'
 import { useAppStore } from '../store/appStore'
 import type { Category, CategoryItem } from '../lib/dataset'
 
@@ -20,20 +21,31 @@ function toLatLng(x: number, z: number): [number, number] {
   return [H - pyFromTop, px]
 }
 
+const iconCache = new Map<string, L.Icon>()
+function categoryIcon(url: string, done: boolean): L.Icon {
+  const key = `${url}|${done}`
+  let icon = iconCache.get(key)
+  if (!icon) {
+    icon = L.icon({ iconUrl: url, iconSize: [22, 22], iconAnchor: [11, 11], className: done ? 'marker-done' : 'marker-pending' })
+    iconCache.set(key, icon)
+  }
+  return icon
+}
+
 export function MapPage() {
   const { t } = useTranslation()
   const data = useDataset()
   const manual = useAppStore((s) => s.manual)
   const fromSave = useAppStore((s) => s.fromSave)
+  const route = useAppStore((s) => s.route)
+  const player = useAppStore((s) => s.player)
 
   const [layer, setLayer] = useState<MapLayer>('surface')
   const [hideDone, setHideDone] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(false)
   const [visible, setVisible] = useState<Set<string>>(
     () => new Set(data.categories.filter((c) => c.defaultVisible).map((c) => c.id)),
   )
-
-  const route = useAppStore((s) => s.route)
-  const player = useAppStore((s) => s.player)
 
   const mapRef = useRef<L.Map | null>(null)
   const overlayRef = useRef<L.ImageOverlay | null>(null)
@@ -50,6 +62,22 @@ export function MapPage() {
   const isDone = useMemo(() => {
     return (catId: string, itemId: string) => !!(manual[catId]?.[itemId] || fromSave[catId]?.[itemId])
   }, [manual, fromSave])
+
+  // pendências por categoria na camada atual (pro painel/legenda)
+  const pendingByCat = useMemo(() => {
+    const out = new Map<string, { pending: number; layerTotal: number }>()
+    for (const cat of data.categories) {
+      let pending = 0
+      let layerTotal = 0
+      for (const item of cat.items) {
+        if ((item.layer ?? 'surface') !== layer) continue
+        layerTotal++
+        if (!isDone(cat.id, item.id)) pending++
+      }
+      out.set(cat.id, { pending, layerTotal })
+    }
+    return out
+  }, [data, layer, isDone])
 
   // init do mapa (uma vez)
   useEffect(() => {
@@ -101,18 +129,23 @@ export function MapPage() {
 
     for (const cat of data.categories) {
       if (!visible.has(cat.id)) continue
+      const meta = categoryMeta(cat.id)
+      const useIcon = !!meta.icon && cat.items.length <= ICON_MARKER_MAX_ITEMS
       for (const item of cat.items) {
         const itemLayer = item.layer ?? 'surface'
         if (itemLayer !== layer) continue
         const done = isDone(cat.id, item.id)
         if (hideDone && done) continue
-        const marker = L.circleMarker(toLatLng(item.x, item.z), {
-          radius: done ? 4.5 : 5,
-          color: done ? 'transparent' : '#57e6c0',
-          weight: 1.5,
-          fillColor: done ? '#2e8c76' : '#0b1210',
-          fillOpacity: done ? 0.85 : 0.75,
-        })
+
+        const marker = useIcon
+          ? L.marker(toLatLng(item.x, item.z), { icon: categoryIcon(meta.icon!, done) })
+          : L.circleMarker(toLatLng(item.x, item.z), {
+              radius: done ? 4 : 4.5,
+              color: done ? 'transparent' : meta.color,
+              weight: 1.5,
+              fillColor: done ? meta.color : '#0b1210',
+              fillOpacity: done ? 0.4 : 0.8,
+            })
         marker.bindPopup(() =>
           buildPopup(cat, item, groupName(cat.id, cat.label), {
             fromSave: !!fromSave[cat.id]?.[item.id],
@@ -166,7 +199,6 @@ export function MapPage() {
         .bindTooltip(s.label)
         .addTo(group)
     })
-    // enquadra a rota ao chegar do Companion
     map.fitBounds(L.latLngBounds(latlngs).pad(0.2))
   }, [route, player, layer])
 
@@ -180,32 +212,67 @@ export function MapPage() {
   }
 
   return (
-    <div className="relative -mx-4" style={{ height: 'calc(100dvh - 148px)' }}>
+    <div className="relative -mx-4 lg:mx-0 lg:overflow-hidden lg:border lg:border-edge" style={{ height: 'calc(100dvh - 148px)' }}>
       <div ref={containerRef} className="h-full w-full" style={{ background: 'var(--color-abyss)' }} />
 
-      {/* chips de categoria */}
-      <div className="absolute inset-x-0 top-0 z-[1000] flex gap-1.5 overflow-x-auto px-3 py-2" style={{ scrollbarWidth: 'none' }}>
-        <button
-          onClick={() => setHideDone((v) => !v)}
-          className="shrink-0 px-2.5 py-1 font-mono text-[11px] uppercase tracking-wide"
-          style={chipStyle(hideDone)}
-        >
+      {/* controles topo: botão de filtros/legenda + esconder feitos */}
+      <div className="absolute left-3 top-3 z-[1000] flex gap-2">
+        <button onClick={() => setPanelOpen((v) => !v)} className="px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide" style={chipStyle(panelOpen)}>
+          ☰ {t('map.legend')}
+        </button>
+        <button onClick={() => setHideDone((v) => !v)} className="px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide" style={chipStyle(hideDone)}>
           {t('map.hideDone')}
         </button>
-        {data.categories.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => toggleCat(c.id)}
-            className="shrink-0 px-2.5 py-1 text-[11px]"
-            style={chipStyle(visible.has(c.id))}
-          >
-            {groupName(c.id, c.label)}
-          </button>
-        ))}
       </div>
 
+      {/* painel filtro+legenda */}
+      {panelOpen && (
+        <div className="absolute bottom-16 left-3 top-14 z-[1000] w-64 overflow-y-auto border border-edge bg-stone/95 p-3 backdrop-blur-sm lg:bottom-4">
+          <div className="mb-2 flex gap-1.5">
+            <button
+              onClick={() => setVisible(new Set(data.categories.map((c) => c.id)))}
+              className="flex-1 border border-edge px-2 py-1 text-[10px] uppercase text-ink-mute hover:text-jade"
+            >
+              {t('map.all')}
+            </button>
+            <button
+              onClick={() => setVisible(new Set())}
+              className="flex-1 border border-edge px-2 py-1 text-[10px] uppercase text-ink-mute hover:text-jade"
+            >
+              {t('map.none')}
+            </button>
+          </div>
+          {data.categories.map((c) => {
+            const meta = categoryMeta(c.id)
+            const info = pendingByCat.get(c.id)
+            if (!info || info.layerTotal === 0) return null
+            const on = visible.has(c.id)
+            return (
+              <button
+                key={c.id}
+                onClick={() => toggleCat(c.id)}
+                className="flex w-full items-center gap-2 px-1.5 py-1.5 text-left text-xs transition-colors hover:bg-stone-2"
+                style={{ opacity: on ? 1 : 0.45 }}
+              >
+                {meta.icon ? (
+                  <img src={meta.icon} alt="" className="h-4 w-4 object-contain" />
+                ) : (
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: meta.color }} />
+                )}
+                <span className="min-w-0 flex-1 truncate" style={{ color: on ? 'var(--color-ink)' : 'var(--color-ink-mute)' }}>
+                  {groupName(c.id, c.label)}
+                </span>
+                <span className="font-mono text-[10px]" style={{ color: info.pending > 0 ? meta.color : 'var(--color-gold)' }}>
+                  {info.pending > 0 ? info.pending : '✓'}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* switch de camada */}
-      <div className="absolute bottom-4 left-3 z-[1000] flex flex-col gap-1">
+      <div className="absolute bottom-4 left-3 z-[999] flex gap-1 lg:flex-col">
         {LAYERS.map((l) => (
           <button
             key={l}

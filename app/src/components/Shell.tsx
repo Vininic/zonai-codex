@@ -26,35 +26,79 @@ export function Shell() {
     document.documentElement.lang = lang === 'pt' ? 'pt-BR' : 'en'
   }, [lang, i18n])
 
+  const toggles = (
+    <div className="flex items-center gap-2">
+      <button
+        onClick={() => setLang(lang === 'en' ? 'pt' : 'en')}
+        className="panel px-2.5 py-1 font-mono text-xs uppercase text-ink-mute transition-colors hover:text-jade"
+        aria-label="Language"
+      >
+        {lang === 'en' ? 'EN' : 'PT'}
+      </button>
+      <button
+        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        className="panel px-2.5 py-1 font-mono text-xs text-ink-mute transition-colors hover:text-jade"
+        aria-label="Theme"
+      >
+        {theme === 'dark' ? '☾' : '☀'}
+      </button>
+    </div>
+  )
+
   return (
-    <div className="mx-auto flex min-h-dvh max-w-3xl flex-col">
-      <header className="flex items-center justify-between px-4 pb-2 pt-4">
-        <h1 className="font-display text-xl text-ink">
-          Zonai <span className="text-jade">Codex</span>
-        </h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setLang(lang === 'en' ? 'pt' : 'en')}
-            className="panel px-2.5 py-1 font-mono text-xs uppercase text-ink-mute transition-colors hover:text-jade"
-            aria-label="Language"
-          >
-            {lang === 'en' ? 'EN' : 'PT'}
-          </button>
-          <button
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="panel px-2.5 py-1 font-mono text-xs text-ink-mute transition-colors hover:text-jade"
-            aria-label="Theme"
-          >
-            {theme === 'dark' ? '☾' : '☀'}
-          </button>
+    <div className="min-h-dvh lg:flex">
+      {/* sidebar desktop */}
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-56 flex-col border-r border-edge bg-stone/60 lg:flex">
+        <div className="flex items-center gap-2.5 px-5 pb-6 pt-6">
+          <img src="/icon.svg" alt="" className="h-8 w-8" />
+          <span className="font-display text-lg leading-none">
+            Zonai <span className="text-jade">Codex</span>
+          </span>
         </div>
-      </header>
+        <nav className="flex flex-1 flex-col gap-1 px-3">
+          {NAV.map(({ to, key, icon: Icon }) => (
+            <NavLink
+              key={key}
+              to={to}
+              end={to === '/'}
+              className={({ isActive }) =>
+                `flex items-center gap-3 rounded-none px-3 py-2.5 text-sm transition-colors ${
+                  isActive ? 'bg-stone-2 text-jade' : 'text-ink-mute hover:bg-stone-2/60 hover:text-ink'
+                }`
+              }
+              style={({ isActive }) => (isActive ? { boxShadow: 'inset 2px 0 0 var(--color-jade)' } : undefined)}
+            >
+              {({ isActive }) => (
+                <>
+                  <Icon active={isActive} />
+                  <span className="uppercase tracking-wider text-xs">{t(`nav.${key}`)}</span>
+                </>
+              )}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="px-5 pb-6">{toggles}</div>
+      </aside>
 
-      <main className="flex-1 px-4 pb-24 pt-2">
-        <Outlet />
-      </main>
+      <div className="flex min-h-dvh w-full flex-col lg:pl-56">
+        {/* header mobile */}
+        <header className="flex items-center justify-between px-4 pb-2 pt-4 lg:hidden">
+          <h1 className="font-display text-xl text-ink">
+            Zonai <span className="text-jade">Codex</span>
+          </h1>
+          {toggles}
+        </header>
 
-      <nav className="fixed inset-x-0 bottom-0 border-t border-edge bg-stone/95 backdrop-blur-sm" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <main className="mx-auto w-full max-w-screen-2xl flex-1 px-4 pb-24 pt-2 lg:px-8 lg:pb-10 lg:pt-8">
+          <Outlet />
+        </main>
+      </div>
+
+      {/* bottom nav mobile */}
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-edge bg-stone/95 backdrop-blur-sm lg:hidden"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
         <div className="mx-auto flex max-w-3xl">
           {NAV.map(({ to, key, icon: Icon }) => (
             <NavLink
@@ -91,7 +135,7 @@ const stroke = (active: boolean) => ({
 
 function RingIcon({ active }: IconProps) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" {...stroke(active)}>
+    <svg width="20" height="20" viewBox="0 0 24 24" {...stroke(active)}>
       <circle cx="12" cy="12" r="8" />
       <circle cx="12" cy="12" r="3" fill={active ? 'currentColor' : 'none'} />
     </svg>
@@ -99,14 +143,14 @@ function RingIcon({ active }: IconProps) {
 }
 function ListIcon({ active }: IconProps) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" {...stroke(active)}>
+    <svg width="20" height="20" viewBox="0 0 24 24" {...stroke(active)}>
       <path d="M4 6h2M4 12h2M4 18h2M10 6h10M10 12h10M10 18h10" strokeLinecap="round" />
     </svg>
   )
 }
 function MapIcon({ active }: IconProps) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" {...stroke(active)}>
+    <svg width="20" height="20" viewBox="0 0 24 24" {...stroke(active)}>
       <path d="M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10Z" />
       <circle cx="12" cy="11" r="2" fill={active ? 'currentColor' : 'none'} />
     </svg>
@@ -114,7 +158,7 @@ function MapIcon({ active }: IconProps) {
 }
 function EyeIcon({ active }: IconProps) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" {...stroke(active)}>
+    <svg width="20" height="20" viewBox="0 0 24 24" {...stroke(active)}>
       <circle cx="12" cy="12" r="8" />
       <circle cx="12" cy="12" r="3.5" />
       <circle cx="12" cy="12" r="1" fill="currentColor" />
@@ -124,7 +168,7 @@ function EyeIcon({ active }: IconProps) {
 }
 function SaveIcon({ active }: IconProps) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" {...stroke(active)}>
+    <svg width="20" height="20" viewBox="0 0 24 24" {...stroke(active)}>
       <path d="M5 4h11l3 3v13H5Z" />
       <path d="M8 4v5h7V4M8 20v-6h8v6" />
       {active && <circle cx="12" cy="17" r="1" fill="currentColor" stroke="none" />}

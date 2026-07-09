@@ -1,8 +1,9 @@
 import { useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store/appStore'
-import { computeProgress, useDataset } from '../lib/useDataset'
+import { computeProgress, useDataset, type GroupProgress } from '../lib/useDataset'
+import { categoryMeta } from '../lib/categoryMeta'
 
 export function Tracker() {
   const { t } = useTranslation()
@@ -17,36 +18,82 @@ export function Tracker() {
     return translated === key ? fallback : translated
   }
 
+  const markers = groups.filter((g) => g.isMarkerCategory)
+  const stats = groups.filter((g) => !g.isMarkerCategory)
+
   return (
-    <div className="space-y-1.5">
-      <h2 className="mb-3 font-display text-lg">{t('tracker.title')}</h2>
-      {groups.map((g) => {
-        const frac = g.total ? g.done / g.total : 0
-        const complete = frac >= 1
-        return (
-          <Link key={g.id} to={`/tracker/${g.id}`} className="panel flex items-center gap-3 px-3.5 py-3 transition-colors hover:border-edge-lit">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="truncate text-sm">{groupName(g.id, g.label)}</span>
-                <span className="shrink-0 font-mono text-xs" style={{ color: complete ? 'var(--color-gold)' : 'var(--color-jade)' }}>
+    <div className="space-y-5">
+      <h2 className="font-display text-lg">{t('tracker.title')}</h2>
+      <div className="grid gap-5 xl:grid-cols-2">
+        <GroupTable title={t('dashboard.markers')} groups={markers} groupName={groupName} />
+        <GroupTable title={t('dashboard.stats')} groups={stats} groupName={groupName} />
+      </div>
+    </div>
+  )
+}
+
+function GroupTable({
+  title,
+  groups,
+  groupName,
+}: {
+  title: string
+  groups: GroupProgress[]
+  groupName: (id: string, fallback: string) => string
+}) {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  return (
+    <section className="panel overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-edge text-left text-[10px] uppercase tracking-widest text-ink-faint">
+            <th className="px-4 py-2.5 font-normal">{title}</th>
+            <th className="hidden w-2/5 px-3 py-2.5 font-normal sm:table-cell">{t('tracker.progress')}</th>
+            <th className="px-3 py-2.5 text-right font-normal">{t('tracker.count')}</th>
+            <th className="w-14 px-4 py-2.5 text-right font-normal">%</th>
+          </tr>
+        </thead>
+        <tbody>
+          {groups.map((g) => {
+            const frac = g.total ? g.done / g.total : 0
+            const complete = frac >= 1
+            const meta = categoryMeta(g.id)
+            const color = complete ? 'var(--color-gold)' : meta.color
+            return (
+              <tr
+                key={g.id}
+                onClick={() => navigate(`/tracker/${g.id}`)}
+                className="cursor-pointer border-b border-edge/40 transition-colors last:border-0 hover:bg-stone-2/60"
+              >
+                <td className="px-4 py-2.5">
+                  <div className="flex items-center gap-2.5">
+                    {meta.icon ? (
+                      <img src={meta.icon} alt="" className="h-4.5 w-4.5 object-contain opacity-90" />
+                    ) : (
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: meta.color }} />
+                    )}
+                    <span className="truncate">{groupName(g.id, g.label)}</span>
+                  </div>
+                </td>
+                <td className="hidden px-3 py-2.5 sm:table-cell">
+                  <div className="h-1 overflow-hidden rounded-full bg-stone-2">
+                    <div
+                      className="h-full rounded-full transition-[width] duration-500"
+                      style={{ width: `${frac * 100}%`, background: color, boxShadow: `0 0 5px ${color}` }}
+                    />
+                  </div>
+                </td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-xs" style={{ color }}>
                   {g.done}
                   <span className="text-ink-faint">/{g.total}</span>
-                </span>
-              </div>
-              <div className="mt-2 h-1 overflow-hidden rounded-full bg-stone-2">
-                <div
-                  className="h-full rounded-full transition-[width] duration-500"
-                  style={{
-                    width: `${frac * 100}%`,
-                    background: complete ? 'var(--color-gold)' : 'var(--color-jade)',
-                    boxShadow: complete ? 'var(--glow-gold)' : frac > 0 ? 'var(--glow-jade)' : undefined,
-                  }}
-                />
-              </div>
-            </div>
-          </Link>
-        )
-      })}
-    </div>
+                </td>
+                <td className="px-4 py-2.5 text-right font-mono text-xs text-ink-mute">{Math.round(frac * 100)}%</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </section>
   )
 }

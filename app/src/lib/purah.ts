@@ -1,5 +1,29 @@
 import type { RouteStep } from '../store/appStore'
 
+/** narração livre da Purah sobre um contexto de plano (chat) */
+export async function purahChatText(apiKey: string, lang: 'en' | 'pt', context: string): Promise<string> {
+  const language = lang === 'pt' ? 'Brazilian Portuguese' : 'English'
+  const prompt = [
+    `You are Purah from Zelda: Tears of the Kingdom — brilliant, energetic Sheikah researcher, fully in character ("Check it!").`,
+    `A completionist player asked for help. A deterministic planner already produced this plan (do NOT change numbers or invent locations):`,
+    context.slice(0, 2500),
+    `Write a short in-character briefing (max 110 words) in ${language}: react, give 1-2 practical tips tied to the plan, encourage. Plain text only.`,
+  ].join('\n\n')
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+    },
+  )
+  if (!res.ok) throw new Error(`Gemini ${res.status}`)
+  const json = await res.json()
+  const text = json?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('')
+  if (!text) throw new Error('empty response')
+  return text.trim()
+}
+
 /**
  * Narrativa opcional da Purah via Gemini (BYOK) — a chave vai direto do
  * browser pra API do usuário; sem chave, o plano determinístico basta.

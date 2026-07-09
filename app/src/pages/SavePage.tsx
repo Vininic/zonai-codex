@@ -93,6 +93,8 @@ export function SavePage() {
     <div className="space-y-4">
       <h2 className="font-display text-lg">{t('save.title')}</h2>
 
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+      <div className="space-y-4">
       <section className="panel space-y-3 p-4">
         <h3 className="font-display text-sm uppercase tracking-widest text-ink-mute">{t('save.importTitle')}</h3>
         <p className="text-sm text-ink-mute">{t('save.importHint')}</p>
@@ -109,7 +111,9 @@ export function SavePage() {
       </section>
 
       {lastDiff && <DiffView diff={lastDiff} />}
+      </div>
 
+      <div className="space-y-4">
       {saveMeta && (
         <section className="panel space-y-2 p-4">
           <h3 className="font-display text-sm uppercase tracking-widest" style={{ color: 'var(--color-jade)' }}>
@@ -146,6 +150,8 @@ export function SavePage() {
           </button>
         </div>
       </section>
+      </div>
+      </div>
 
       <p className="text-center text-[10px] text-ink-faint">{t('common.credits')}</p>
     </div>
