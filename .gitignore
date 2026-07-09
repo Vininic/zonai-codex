@@ -1,0 +1,16 @@
+# dependências e build
+node_modules/
+dist/
+dev-dist/
+
+# clones de referência (reproduzíveis — ver reference/NOTES.md)
+reference/totk-100-live-map/
+reference/savegame-editors/
+
+# saves pessoais de teste (o demo do app vive em app/public/demo/)
+fixtures/
+
+# ambiente
+.env
+.env.*
+.vercel

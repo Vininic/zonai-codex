@@ -1,0 +1,102 @@
+@import 'tailwindcss';
+@import '@fontsource/marcellus';
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
+/* ── Zonai Codex design tokens ─────────────────────────────── */
+@theme {
+  --font-display: 'Marcellus', serif;
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  /* dark (default) — "ruína Zonai à noite" */
+  --color-abyss: #0b1210;
+  --color-stone: #131e1a;
+  --color-stone-2: #1a2823;
+  --color-edge: #26382f;
+  --color-edge-lit: #3a5546;
+  --color-ink: #e6f1ea;
+  --color-ink-mute: #8fa79b;
+  --color-ink-faint: #5c7268;
+  --color-jade: #57e6c0;
+  --color-jade-deep: #2e8c76;
+  --color-gold: #d9b96a;
+  --color-gloom: #d95d6a;
+}
+
+:root {
+  --glow-jade: 0 0 12px rgba(87, 230, 192, 0.35), 0 0 32px rgba(87, 230, 192, 0.12);
+  --glow-gold: 0 0 12px rgba(217, 185, 106, 0.35), 0 0 32px rgba(217, 185, 106, 0.12);
+}
+
+/* light — "pedra clara ao sol" */
+:root[data-theme='light'] {
+  --color-abyss: #ece7da;
+  --color-stone: #f4f0e5;
+  --color-stone-2: #e4ddcc;
+  --color-edge: #cfc6ae;
+  --color-edge-lit: #b3a682;
+  --color-ink: #22312b;
+  --color-ink-mute: #5c7268;
+  --color-ink-faint: #8fa79b;
+  --color-jade: #178a6c;
+  --color-jade-deep: #2e8c76;
+  --color-gold: #a07c2c;
+  --color-gloom: #b33c49;
+  --glow-jade: none;
+  --glow-gold: none;
+}
+
+html,
+body {
+  background: var(--color-abyss);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* textura de fundo: brilhos Zonai muito sutis nos cantos */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 85% -10%, rgba(87, 230, 192, 0.05), transparent 42%),
+    radial-gradient(circle at -15% 100%, rgba(87, 230, 192, 0.04), transparent 40%);
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+/* painel de pedra com canto chanfrado (assinatura estrutural) */
+.panel {
+  background: var(--color-stone);
+  border: 1px solid var(--color-edge);
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+}
+
+.rune-pulse {
+  animation: rune-pulse 0.45s ease-out;
+}
+@keyframes rune-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(87, 230, 192, 0.55); }
+  100% { box-shadow: 0 0 0 14px rgba(87, 230, 192, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-jade);
+  outline-offset: 2px;
+}
