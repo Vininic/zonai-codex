@@ -202,10 +202,10 @@ Adaptadores de IA: **reaproveitar do Mythquill** (Gemini + OpenAI-compatible). S
 ### F2 — Tracker + métricas
 - [x] Páginas de categoria com check manual (pulso de runa), filtros feito/pendente, busca, badge "sav" pra itens detectados do save (2026-07-09)
 - [x] Dashboard: True 100% (média normalizada) + anéis por categoria/stat (2026-07-09)
-- [ ] Map % (réplica do contador do jogo) como métrica separada
+- [x] Map % como anel separado no dashboard — aproximação: locations+shrines+lightroots+towers+caves+wells+chasms (jogo conta caverna 1×/nosso dataset conta entradas; dispensers faltam no dataset) (2026-07-09)
+- [x] Configuração "Meu 100%": toggles de grupos no True 100% (2026-07-09)
+- [x] Export/import JSON do progresso (página Save) (2026-07-09)
 - [ ] Bulk check por região + agrupamento por região
-- [ ] Configuração "o que entra no meu 100%"
-- [ ] Export/import JSON do progresso
 - [ ] Migrar persistência de localStorage pra Dexie/IndexedDB se o estado crescer
 
 ### F3 — Mapa
@@ -221,12 +221,14 @@ Adaptadores de IA: **reaproveitar do Mythquill** (Gemini + OpenAI-compatible). S
 - [x] Import → auto-check do tracker + botão "Load demo save" (fixture em `app/public/demo/`) (2026-07-09)
 - [x] Parse do pouch: materials/key items/armor/armor 4★ lidos do save (validado: 249/251, 38/38, 135/136, 103/104 no fixture → geral 98,8%) (2026-07-09)
 - [x] Diff de import estilo git ao sobrepor save carregado: ±itens por categoria + deltas de player (2026-07-09)
-- [ ] Serializer/editor (rupees, itens, armaduras+upgrades, key items, amiibo, flags trackeadas) com diff + backup + export
+- [x] Editor v1 (2026-07-09): staged changes = marcas manuais à frente do save (kinds bool/seed/positive, com requires) + player (rupees/corações/stamina/bateria); seleção por grupo, grava em clone do buffer, download + auto-reimport (diff git mostra o que mudou), backup do original. Buffer vive só na sessão (reimportar pra editar). Testado ponta-a-ponta: +3 baús + rupees 99999 gravados e relidos ✓
+- [ ] Editor v2: categorias guid (bubbulfrogs/hudson/sage's will — append no array de GUIDs), compendium (reverse), inventário/pouch (adicionar armaduras/materiais/amiibo, upgrades 4★)
 
 ### F5 — Companion IA
-- [ ] Planner determinístico local (próximos passos por proximidade/densidade)
-- [ ] Adaptadores BYOK (port do Mythquill) + persona Purah + JSON estruturado
-- [ ] Flow visual (stepper) + desenho da rota no mapa
+- [x] Planner determinístico local: vizinho-mais-próximo a partir do SavePos do save (parseado, com transformação de coords) por camada/categorias focadas (2026-07-09)
+- [x] Flow visual (lista numerada) + rota no mapa: polyline dourada + markers numerados + posição do player (2026-07-09)
+- [x] Narrativa da Purah via Gemini BYOK (gemini-2.5-flash, chave persistida no browser, EN/PT) — opcional, planner funciona sem (2026-07-09) ⚠️ não testado com chave real
+- [ ] Planner v2: considerar densidade/clusters e travessia entre camadas; usar quests pendentes no plano
 
 ### F6 — Polish e lançamento
 - [ ] Passe de identidade visual completo, animações, empty states
