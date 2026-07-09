@@ -189,13 +189,13 @@ Adaptadores de IA: **reaproveitar do Mythquill** (Gemini + OpenAI-compatible). S
 - [x] Scaffold: Vite + React + TS + Tailwind v4 + Zustand (persist) + react-i18next + vite-plugin-pwa (`app/`)
 - [x] Design system Zonai: tokens dark/light ("ruína Zonai à noite" / "pedra ao sol"), Marcellus + IBM Plex Sans/Mono, painéis chanfrados, ZonaiRing (anel de ticks com glow, dourado no 100%), HUD bar (corações/stamina/bateria/rupees)
 - [x] Layout mobile-first com as 5 áreas (Dashboard / Tracker / Mapa / Companion / Save) + toggles EN↔PT e tema
-- [ ] Deploy Vercel
+- [x] Deploy Vercel — **https://zonai-codex.vercel.app** (2026-07-09); git init + commits no repo local
 
 ### F1 — Pipeline de dados (a fase invisível que define tudo)
 - [x] Pesquisa: fontes de datasets e dicionários de hash — **TOTK-100-live-map (MIT) + savegame-editors (MIT)**, clonados em `reference/` (2026-07-09)
 - [x] Spike do formato do save: parser validado contra o fixture ~100% (`scripts/spike-parse-save.mjs` — todas as 23 categorias corretas, murmur3 conferido) (2026-07-09)
 - [ ] Schema canônico das entidades + script de normalização (gerar os JSONs do app a partir do completion_data.json + nomes PT-BR)
-- [ ] Nomes PT-BR das entidades (tradução oficial do jogo — fonte comunitária a localizar)
+- [ ] Nomes humanos EN de shrines/lightroots/koroks (dataset só tem GUID+coords; fallback atual mostra coordenadas). Nomes próprios ficam em inglês por decisão (2026-07-09) — só UI é traduzida
 - [ ] Obter/gerar a pirâmide de tiles das 3 camadas (fontes comunitárias; hospedamos nós mesmos, §1.4)
 - [ ] Parse do pouch (inventário) pra stats de materials/key items/armor level (portar do savegame-editors)
 
@@ -216,7 +216,8 @@ Adaptadores de IA: **reaproveitar do Mythquill** (Gemini + OpenAI-compatible). S
 ### F4 — Save
 - [x] Parser do progress.sav em TS (`app/src/lib/saveParser.ts`) — validado contra o save ~100% no app (4.270 itens detectados, números idênticos ao spike) (2026-07-09)
 - [x] Import → auto-check do tracker + botão "Load demo save" (fixture em `app/public/demo/`) (2026-07-09)
-- [ ] Parse do pouch: materials 251 / key items 38 / armor 136 / armor 4★ 104 (hoje aparecem 0 do save — só manual)
+- [x] Parse do pouch: materials/key items/armor/armor 4★ lidos do save (validado: 249/251, 38/38, 135/136, 103/104 no fixture → geral 98,8%) (2026-07-09)
+- [x] Diff de import estilo git ao sobrepor save carregado: ±itens por categoria + deltas de player (2026-07-09)
 - [ ] Serializer/editor (rupees, itens, armaduras+upgrades, key items, amiibo, flags trackeadas) com diff + backup + export
 
 ### F5 — Companion IA

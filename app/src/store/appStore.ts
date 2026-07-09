@@ -68,6 +68,9 @@ export const useAppStore = create<AppState>()(
       setTheme: (theme) => set({ theme }),
       toggleManual: (groupId, itemId) =>
         set((s) => {
+          // itens confirmados pelo save não são des/marcáveis manualmente —
+          // o save é a fonte de verdade até outro import ou edição (F4)
+          if (s.fromSave[groupId]?.[itemId]) return s
           const group = { ...(s.manual[groupId] ?? {}) }
           if (group[itemId]) delete group[itemId]
           else group[itemId] = 1

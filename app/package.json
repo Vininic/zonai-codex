@@ -14,6 +14,7 @@
     "@fontsource/ibm-plex-sans": "^5.2.8",
     "@fontsource/marcellus": "^5.2.8",
     "i18next": "^26.3.5",
+    "leaflet": "^1.9.4",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-i18next": "^17.0.8",
@@ -22,6 +23,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.2",
+    "@types/leaflet": "^1.9.21",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",

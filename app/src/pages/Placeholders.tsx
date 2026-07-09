@@ -17,10 +17,6 @@ function ComingSoon({ titleKey, bodyKey }: { titleKey: string; bodyKey: string }
   )
 }
 
-export function MapPage() {
-  return <ComingSoon titleKey="map.title" bodyKey="map.soon" />
-}
-
 export function Companion() {
   return <ComingSoon titleKey="companion.title" bodyKey="companion.soon" />
 }

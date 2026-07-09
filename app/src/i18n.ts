@@ -18,7 +18,13 @@ const resources = {
         seeds: 'seeds',
       },
       tracker: { title: 'Tracker', searchPlaceholder: 'Search items…', done: 'Done', pending: 'Pending', all: 'All', empty: 'No items match.' },
-      map: { title: 'Map', soon: 'The interactive map arrives in the next phase — every marker you see in the Tracker already has coordinates waiting for it.' },
+      map: {
+        title: 'Map',
+        hideDone: 'Hide done',
+        markDone: 'Mark done',
+        markUndone: 'Unmark',
+        layers: { surface: 'Surface', sky: 'Sky', depths: 'Depths' },
+      },
       companion: { title: 'Companion', soon: 'Purah is calibrating the Purah Pad. Soon she will read your progress, plan your next steps and draw routes on the map.' },
       save: {
         title: 'Save',
@@ -53,7 +59,13 @@ const resources = {
         seeds: 'sementes',
       },
       tracker: { title: 'Tracker', searchPlaceholder: 'Buscar itens…', done: 'Feitos', pending: 'Pendentes', all: 'Todos', empty: 'Nenhum item encontrado.' },
-      map: { title: 'Mapa', soon: 'O mapa interativo chega na próxima fase — cada marker do Tracker já tem coordenadas esperando por ele.' },
+      map: {
+        title: 'Mapa',
+        hideDone: 'Esconder feitos',
+        markDone: 'Marcar feito',
+        markUndone: 'Desmarcar',
+        layers: { surface: 'Superfície', sky: 'Céu', depths: 'Profundezas' },
+      },
       companion: { title: 'Companion', soon: 'Purah está calibrando o Purah Pad. Em breve ela vai ler seu progresso, planejar seus próximos passos e desenhar rotas no mapa.' },
       save: {
         title: 'Save',

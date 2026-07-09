@@ -18,6 +18,11 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: { cacheName: 'zonai-data' },
           },
+          {
+            urlPattern: /\/map\/.*\.webp$/,
+            handler: 'CacheFirst',
+            options: { cacheName: 'zonai-map' },
+          },
         ],
       },
       manifest: {
