@@ -36,6 +36,7 @@ const resources = {
         detected: 'detected from save',
       },
       hud: { rupees: 'Rupees', hearts: 'Hearts', stamina: 'Stamina', battery: 'Battery' },
+      diff: { title: 'Import diff', empty: 'No changes — same progress as the previous save.' },
       common: { of: 'of', credits: 'Fan project — not affiliated with Nintendo. Data: TOTK-100-live-map & savegame-editors (MIT).' },
       groups: {} as Record<string, string>,
     },
@@ -70,6 +71,7 @@ const resources = {
         detected: 'detectado do save',
       },
       hud: { rupees: 'Rupees', hearts: 'Corações', stamina: 'Stamina', battery: 'Bateria' },
+      diff: { title: 'Diff do import', empty: 'Sem mudanças — mesmo progresso do save anterior.' },
       common: { of: 'de', credits: 'Projeto de fã — sem afiliação com a Nintendo. Dados: TOTK-100-live-map e savegame-editors (MIT).' },
       groups: {
         towers: 'Torres de Observação',

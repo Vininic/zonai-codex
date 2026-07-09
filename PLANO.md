@@ -124,6 +124,15 @@ Rupees, materiais, armas/escudos/arcos (perecíveis), cavalos, coletáveis de Am
 
 ---
 
+## 3.5 Modelo UX: tracker × editor de save (decisão 2026-07-09)
+
+**Uma checklist só, papéis distintos — nunca duas tabelas.**
+
+- **Tracker** = a intenção/estado do jogador. Cada item é "feito" se veio do save importado (badge `sav`) **ou** foi marcado manualmente. Marcar/desmarcar no tracker NUNCA mexe no save.
+- **Editor (F4)** = operação explícita na área **Save**, modelada como *staged changes* (mentalidade git): o app calcula a diferença tracker ↔ save carregado e apresenta como mudanças propostas ("você marcou 3 shrines que não estão no save — escrever no arquivo?"); o usuário seleciona o que aplicar, vê o **diff final** e exporta. Edições diretas (rupees, quantidades) também entram no mesmo staging.
+- **Import com save já carregado** = mostra **diff estilo git** por item: `+` conquistas novas, `−` regressões (save mais antigo), deltas de player (rupees/corações/stamina/bateria). Sem save anterior, sem diff (tudo seria "+").
+- **i18n de conteúdo**: nomes próprios do jogo (shrines, itens, locais) ficam em inglês — sem caça à localização oficial da Nintendo; só a UI é traduzida.
+
 ## 4. Tracker (F2)
 
 - Dashboard: anel geral True 100% + Map % + grid de anéis por categoria + "recentes" + streak opcional.

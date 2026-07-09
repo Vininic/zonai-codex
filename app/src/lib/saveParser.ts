@@ -40,6 +40,27 @@ export interface ParsedSave {
   values: Map<number, number>
   guids: Set<bigint>
   player: PlayerStats
+  /** buffer original — necessário pra ler arrays apontados (pouch etc.) */
+  buffer: ArrayBuffer
+}
+
+/** lê um array de String64 (u32 count + entradas de 64 bytes) apontado por `pointer` */
+export function readString64Array(buffer: ArrayBuffer, pointer: number | undefined): string[] {
+  if (pointer === undefined || pointer < 0 || pointer + 4 > buffer.byteLength) return []
+  const dv = new DataView(buffer)
+  const count = dv.getUint32(pointer, true)
+  const start = pointer + 4
+  if (count <= 0 || start + count * 64 > buffer.byteLength) return []
+  const bytes = new Uint8Array(buffer)
+  const decoder = new TextDecoder()
+  const values: string[] = []
+  for (let i = 0; i < count; i++) {
+    const slice = bytes.subarray(start + i * 64, start + (i + 1) * 64)
+    const nul = slice.indexOf(0)
+    const text = decoder.decode(nul === -1 ? slice : slice.subarray(0, nul)).trim()
+    if (text) values.push(text)
+  }
+  return values
 }
 
 export class SaveParseError extends Error {}
@@ -94,5 +115,6 @@ export function parseSave(buffer: ArrayBuffer): ParsedSave {
     values,
     guids,
     player,
+    buffer,
   }
 }

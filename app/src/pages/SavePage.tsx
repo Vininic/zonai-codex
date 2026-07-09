@@ -2,7 +2,9 @@ import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { parseSave, SaveParseError } from '../lib/saveParser'
 import { evaluateSave } from '../lib/completion'
+import { computeImportDiff } from '../lib/importDiff'
 import { useDataset } from '../lib/useDataset'
+import { DiffView } from '../components/DiffView'
 import { useAppStore, type Progress } from '../store/appStore'
 
 export function SavePage() {
@@ -12,6 +14,7 @@ export function SavePage() {
   const clearSave = useAppStore((s) => s.clearSave)
   const saveMeta = useAppStore((s) => s.saveMeta)
   const fromSave = useAppStore((s) => s.fromSave)
+  const lastDiff = useAppStore((s) => s.lastDiff)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -28,11 +31,16 @@ export function SavePage() {
         for (const id of ids) set[id] = 1
         progress[groupId] = set
       }
+      // diff só faz sentido sobrepondo um save já carregado
+      const prev = useAppStore.getState()
+      const diff = prev.saveMeta
+        ? computeImportDiff(prev.fromSave, progress, prev.player, parsed.player, prev.saveMeta.fileName, fileName)
+        : null
       setSaveResult(progress, parsed.player, {
         version: parsed.version,
         fileName,
         importedAt: new Date().toISOString(),
-      })
+      }, diff)
     } catch (e) {
       setError(e instanceof SaveParseError ? t('save.invalid') : String(e))
     } finally {
@@ -84,6 +92,8 @@ export function SavePage() {
         </div>
         {error && <p className="text-sm" style={{ color: 'var(--color-gloom)' }}>{error}</p>}
       </section>
+
+      {lastDiff && <DiffView diff={lastDiff} />}
 
       {saveMeta && (
         <section className="panel space-y-2 p-4">

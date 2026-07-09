@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store/appStore'
 import { useDataset } from '../lib/useDataset'
+import { itemLabel } from '../lib/itemLabel'
 
 type Filter = 'all' | 'pending' | 'done'
 
@@ -33,10 +34,7 @@ export function Category() {
       const done = !!(manualSet[item.id] || saveSet[item.id])
       if (filter === 'done' && !done) return false
       if (filter === 'pending' && done) return false
-      if (q) {
-        const label = ('label' in item && item.label) || ('note' in item && (item as { note?: string }).note) || item.id
-        return label.toLowerCase().includes(q)
-      }
+      if (q) return itemLabel(item).toLowerCase().includes(q)
       return true
     })
   }, [group, filter, query, manualSet, saveSet])
@@ -87,7 +85,7 @@ export function Category() {
         {items.map((item) => {
           const fromSaveDone = !!saveSet[item.id]
           const done = !!(manualSet[item.id] || fromSaveDone)
-          const label = ('label' in item && item.label) || ('note' in item && (item as { note?: string }).note) || item.id
+          const label = itemLabel(item)
           return (
             <li key={item.id} style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 46px' }}>
               <button

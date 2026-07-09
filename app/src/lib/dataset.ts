@@ -34,8 +34,15 @@ export interface Category {
 
 export interface StatItem {
   id: string
-  value: string
+  value?: string
   label?: string
+  /** inventory_collection: nome do actor no pouch */
+  actorName?: string
+  /** armor_inventory: ids de todos os níveis da peça */
+  ids?: string[]
+  /** armor_upgraded: id(s) da peça no nível 4★ */
+  upgradedId?: string
+  upgradedIds?: string[]
 }
 
 export interface Stat {
@@ -44,6 +51,8 @@ export interface Stat {
   kind: StatKind
   targetValue?: string | null
   includeMissing?: boolean
+  /** hash do array String64 do pouch (kinds de inventário) */
+  arrayHash?: string
   items: StatItem[]
 }
 

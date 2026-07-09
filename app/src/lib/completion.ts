@@ -1,4 +1,5 @@
-import { CLEAR_HASH, type ParsedSave } from './saveParser'
+import { CLEAR_HASH, readString64Array, type ParsedSave } from './saveParser'
+import { murmur3 } from './murmur3'
 import type { Category, CompletionData, Stat } from './dataset'
 
 /**
@@ -34,12 +35,50 @@ export function isCategoryItemDone(
 }
 
 export function isStatItemDone(stat: Stat, item: Stat['items'][number], save: ParsedSave): boolean {
-  const raw = save.values.get(parseInt(item.value, 16)) ?? 0
+  const raw = save.values.get(parseInt(item.value ?? '0', 16)) ?? 0
   return isRawObtained(stat, raw)
 }
 
-/** kinds de stat já suportados na leitura do save (os demais exigem parse do pouch — F4). */
-export const SUPPORTED_STAT_KINDS = new Set(['positive', 'reverse'])
+/** todos os kinds de stat são lidos do save (inventário via arrays do pouch) */
+export const SUPPORTED_STAT_KINDS = new Set([
+  'positive',
+  'reverse',
+  'inventory_collection',
+  'armor_inventory',
+  'armor_upgraded',
+])
+
+// Travel Medallion: o pouch de key items não repete Obj_WarpDLC por slot;
+// a posse completa segue o enum da quest Step_GetWarpMarker (>= 7)
+const TRAVEL_MEDALLION_ACTOR = 'Obj_WarpDLC'
+const H_WARP_MARKER_STEP = murmur3('Step_GetWarpMarker')
+const WARP_MARKER_FINAL_STEP = 7
+
+function pouchNames(stat: Stat, save: ParsedSave): Set<string> {
+  const pointer = stat.arrayHash ? save.values.get(parseInt(stat.arrayHash, 16)) : undefined
+  return new Set(readString64Array(save.buffer, pointer))
+}
+
+function evaluateInventoryStat(stat: Stat, save: ParsedSave): Set<string> {
+  const pouch = pouchNames(stat, save)
+  const done = new Set<string>()
+  for (const item of stat.items) {
+    let obtained: boolean
+    if (stat.kind === 'armor_inventory') {
+      obtained = (item.ids ?? []).some((id) => pouch.has(id))
+    } else if (stat.kind === 'armor_upgraded') {
+      const ids = item.upgradedIds ?? (item.upgradedId ? [item.upgradedId] : [])
+      obtained = ids.some((id) => pouch.has(id))
+    } else {
+      obtained = !!item.actorName && pouch.has(item.actorName)
+      if (obtained && item.actorName === TRAVEL_MEDALLION_ACTOR) {
+        obtained = (save.values.get(H_WARP_MARKER_STEP) ?? 0) >= WARP_MARKER_FINAL_STEP
+      }
+    }
+    if (obtained) done.add(item.id)
+  }
+  return done
+}
 
 /** ids (categoria ou stat) -> ids de itens concluídos segundo o save */
 export function evaluateSave(data: CompletionData, save: ParsedSave): Map<string, Set<string>> {
@@ -50,6 +89,10 @@ export function evaluateSave(data: CompletionData, save: ParsedSave): Map<string
     result.set(cat.id, done)
   }
   for (const stat of data.stats) {
+    if (stat.kind === 'inventory_collection' || stat.kind === 'armor_inventory' || stat.kind === 'armor_upgraded') {
+      result.set(stat.id, evaluateInventoryStat(stat, save))
+      continue
+    }
     if (!SUPPORTED_STAT_KINDS.has(stat.kind)) continue
     const done = new Set<string>()
     for (const item of stat.items) if (isStatItemDone(stat, item, save)) done.add(item.id)

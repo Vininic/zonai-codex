@@ -12,6 +12,28 @@ export interface SaveMeta {
   importedAt: string
 }
 
+export interface GroupDiff {
+  groupId: string
+  /** ids concluídos no save novo mas não no anterior */
+  added: string[]
+  /** ids concluídos no anterior mas não no novo (save mais antigo) */
+  removed: string[]
+}
+
+export interface PlayerDelta {
+  key: 'rupees' | 'hearts' | 'stamina' | 'battery'
+  from: number
+  to: number
+}
+
+export interface ImportDiff {
+  fromFile: string
+  toFile: string
+  at: string
+  groups: GroupDiff[]
+  player: PlayerDelta[]
+}
+
 interface AppState {
   lang: 'en' | 'pt'
   theme: 'dark' | 'light'
@@ -21,11 +43,13 @@ interface AppState {
   fromSave: Progress
   player: PlayerStats | null
   saveMeta: SaveMeta | null
+  /** diff do último import feito sobre um save já carregado */
+  lastDiff: ImportDiff | null
 
   setLang: (lang: 'en' | 'pt') => void
   setTheme: (theme: 'dark' | 'light') => void
   toggleManual: (groupId: string, itemId: string) => void
-  setSaveResult: (fromSave: Progress, player: PlayerStats, meta: SaveMeta) => void
+  setSaveResult: (fromSave: Progress, player: PlayerStats, meta: SaveMeta, diff: ImportDiff | null) => void
   clearSave: () => void
 }
 
@@ -38,6 +62,7 @@ export const useAppStore = create<AppState>()(
       fromSave: {},
       player: null,
       saveMeta: null,
+      lastDiff: null,
 
       setLang: (lang) => set({ lang }),
       setTheme: (theme) => set({ theme }),
@@ -48,8 +73,9 @@ export const useAppStore = create<AppState>()(
           else group[itemId] = 1
           return { manual: { ...s.manual, [groupId]: group } }
         }),
-      setSaveResult: (fromSave, player, meta) => set({ fromSave, player, saveMeta: meta }),
-      clearSave: () => set({ fromSave: {}, player: null, saveMeta: null }),
+      setSaveResult: (fromSave, player, meta, diff) =>
+        set({ fromSave, player, saveMeta: meta, lastDiff: diff }),
+      clearSave: () => set({ fromSave: {}, player: null, saveMeta: null, lastDiff: null }),
     }),
     { name: 'zonai-codex' },
   ),
