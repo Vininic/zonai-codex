@@ -54,8 +54,35 @@ export function computeProgress(data: CompletionData, manual: Progress, fromSave
   return groups
 }
 
-/** "True 100%": média normalizada — cada grupo pesa igual */
-export function overallFraction(groups: GroupProgress[]): number {
-  if (groups.length === 0) return 0
-  return groups.reduce((acc, g) => acc + (g.total ? g.done / g.total : 0), 0) / groups.length
+/** "True 100%": média normalizada — cada grupo pesa igual; respeita exclusões do usuário */
+export function overallFraction(groups: GroupProgress[], excluded: Record<string, 1> = {}): number {
+  const active = groups.filter((g) => !excluded[g.id])
+  if (active.length === 0) return 0
+  return active.reduce((acc, g) => acc + (g.total ? g.done / g.total : 0), 0) / active.length
+}
+
+/**
+ * Grupos que compõem o contador de mapa do próprio jogo (aproximação:
+ * o jogo conta cavernas 1×, nosso dataset conta entradas; dispensers faltam).
+ */
+export const MAP_PERCENT_GROUPS = new Set([
+  'general_locations',
+  'shrines',
+  'lightroots',
+  'towers',
+  'caves',
+  'wells',
+  'chasms',
+])
+
+/** "Map %": contagem bruta (cada descoberta vale 1), como no jogo */
+export function mapFraction(groups: GroupProgress[]): number {
+  let done = 0
+  let total = 0
+  for (const g of groups) {
+    if (!MAP_PERCENT_GROUPS.has(g.id)) continue
+    done += g.done
+    total += g.total
+  }
+  return total ? done / total : 0
 }

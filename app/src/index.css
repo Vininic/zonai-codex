@@ -81,6 +81,21 @@ body::before {
   clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
 }
 
+/* botão primário jade com canto chanfrado */
+.btn-jade {
+  background: var(--color-jade);
+  color: var(--color-abyss);
+  box-shadow: var(--glow-jade);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: transform 0.1s;
+}
+.btn-jade:active {
+  transform: scale(0.95);
+}
+
 .rune-pulse {
   animation: rune-pulse 0.45s ease-out;
 }

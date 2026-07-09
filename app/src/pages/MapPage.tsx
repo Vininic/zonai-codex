@@ -32,9 +32,13 @@ export function MapPage() {
     () => new Set(data.categories.filter((c) => c.defaultVisible).map((c) => c.id)),
   )
 
+  const route = useAppStore((s) => s.route)
+  const player = useAppStore((s) => s.player)
+
   const mapRef = useRef<L.Map | null>(null)
   const overlayRef = useRef<L.ImageOverlay | null>(null)
   const markersRef = useRef<L.LayerGroup | null>(null)
+  const routeRef = useRef<L.LayerGroup | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const groupName = (id: string, fallback: string) => {
@@ -66,12 +70,14 @@ export function MapPage() {
     L.control.zoom({ position: 'bottomright' }).addTo(map)
     mapRef.current = map
     markersRef.current = L.layerGroup().addTo(map)
+    routeRef.current = L.layerGroup().addTo(map)
     if (import.meta.env.DEV) (window as unknown as { __map?: L.Map }).__map = map
     return () => {
       map.remove()
       mapRef.current = null
       overlayRef.current = null
       markersRef.current = null
+      routeRef.current = null
     }
   }, [])
 
@@ -121,6 +127,48 @@ export function MapPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, layer, visible, hideDone, isDone])
+
+  // rota da companion + posição do player
+  useEffect(() => {
+    const map = mapRef.current
+    const group = routeRef.current
+    if (!map || !group) return
+    group.clearLayers()
+
+    if (player?.position && player.position.layer === layer) {
+      L.circleMarker(toLatLng(player.position.x, player.position.z), {
+        radius: 7,
+        color: '#d9b96a',
+        weight: 2,
+        fillColor: '#d9b96a',
+        fillOpacity: 0.5,
+      })
+        .bindTooltip('Link')
+        .addTo(group)
+    }
+
+    const steps = (route ?? []).filter((s) => s.layer === layer)
+    if (steps.length === 0) return
+    const latlngs = steps.map((s) => toLatLng(s.x, s.z))
+    if (player?.position && player.position.layer === layer) {
+      latlngs.unshift(toLatLng(player.position.x, player.position.z))
+    }
+    L.polyline(latlngs, { color: '#d9b96a', weight: 2, dashArray: '6 6', opacity: 0.9 }).addTo(group)
+    steps.forEach((s, i) => {
+      L.marker(toLatLng(s.x, s.z), {
+        icon: L.divIcon({
+          className: '',
+          html: `<div style="width:20px;height:20px;border-radius:50%;background:#d9b96a;color:#0b1210;font:600 11px/20px var(--font-mono);text-align:center;box-shadow:0 0 8px rgba(217,185,106,.6)">${i + 1}</div>`,
+          iconSize: [20, 20],
+          iconAnchor: [10, 10],
+        }),
+      })
+        .bindTooltip(s.label)
+        .addTo(group)
+    })
+    // enquadra a rota ao chegar do Companion
+    map.fitBounds(L.latLngBounds(latlngs).pad(0.2))
+  }, [route, player, layer])
 
   const toggleCat = (id: string) => {
     setVisible((prev) => {

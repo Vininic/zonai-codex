@@ -22,6 +22,15 @@ const H_RUPEES = murmur3('PlayerStatus.CurrentRupee')
 const H_MAX_LIFE = murmur3('PlayerStatus.MaxLife')
 const H_MAX_STAMINA = murmur3('PlayerStatus.MaxStamina')
 const H_MAX_ENERGY = murmur3('PlayerStatus.MaxEnergy')
+const H_SAVE_POS = murmur3('PlayerStatus.SavePos')
+
+export interface PlayerPosition {
+  /** coords no referencial do dataset (+z = norte) */
+  x: number
+  y: number
+  z: number
+  layer: 'sky' | 'surface' | 'depths'
+}
 
 export interface PlayerStats {
   rupees: number
@@ -31,6 +40,7 @@ export interface PlayerStats {
   maxStaminaWheels: number
   batteryCells: number
   maxBatteryCells: number
+  position: PlayerPosition | null
 }
 
 export interface ParsedSave {
@@ -99,6 +109,23 @@ export function parseSave(buffer: ArrayBuffer): ParsedSave {
     guids.add((BigInt(upper) << 32n) | BigInt(lower))
   }
 
+  // SavePos é ponteiro pra Vector3F; transformações do live-map:
+  // dataset x = raw x, z = −raw z (+z vira norte), y_render = raw y − 106
+  let position: PlayerPosition | null = null
+  const posPtr = values.get(H_SAVE_POS)
+  if (posPtr !== undefined && posPtr + 12 <= buffer.byteLength) {
+    const rawX = dv.getFloat32(posPtr, true)
+    const rawY = dv.getFloat32(posPtr + 4, true)
+    const rawZ = dv.getFloat32(posPtr + 8, true)
+    const y = rawY - 106
+    position = {
+      x: rawX,
+      y,
+      z: -rawZ,
+      layer: y >= 700 ? 'sky' : y < -100 ? 'depths' : 'surface',
+    }
+  }
+
   const player: PlayerStats = {
     rupees: values.get(H_RUPEES) ?? 0,
     hearts: (values.get(H_MAX_LIFE) ?? 0) / 4,
@@ -107,6 +134,7 @@ export function parseSave(buffer: ArrayBuffer): ParsedSave {
     maxStaminaWheels: 3,
     batteryCells: reinterpretF32(values.get(H_MAX_ENERGY) ?? 0) / 1000,
     maxBatteryCells: 48,
+    position,
   }
 
   return {

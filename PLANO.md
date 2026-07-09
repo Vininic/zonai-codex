@@ -209,8 +209,11 @@ Adaptadores de IA: **reaproveitar do Mythquill** (Gemini + OpenAI-compatible). S
 - [ ] Migrar persistência de localStorage pra Dexie/IndexedDB se o estado crescer
 
 ### F3 — Mapa
-- [ ] Leaflet CRS.Simple, 3 camadas, markers com estado, filtros, clustering
-- [ ] Sync bidirecional tracker ↔ mapa
+- [x] Leaflet CRS.Simple + ImageOverlay (WebP 4096px por camada, gerados dos mapas MIT do live-map por `scripts/prepare-map-images.mjs`), 3 camadas, ~3.1k markers canvas com estado, chips de filtro, esconder feitos (2026-07-09)
+- [x] Sync tracker ↔ mapa: popup com check manual; itens `sav` travados (guard na store) (2026-07-09)
+- [ ] Markers co-localizados (baús de shrine sobre o shrine): spiderfy/offset ao tocar
+- [ ] Ícones por categoria nos markers (hoje: círculo único)
+- [ ] Clustering em zoom-out se performance pedir
 - [ ] Modo "jogando agora" (região atual → o que falta perto)
 
 ### F4 — Save

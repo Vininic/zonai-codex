@@ -2,6 +2,15 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { PlayerStats } from '../lib/saveParser'
 
+export interface RouteStep {
+  groupId: string
+  itemId: string
+  label: string
+  x: number
+  z: number
+  layer: string
+}
+
 /** conjuntos de ids serializados como Record pra persistir em JSON */
 export type IdSet = Record<string, 1>
 export type Progress = Record<string, IdSet>
@@ -45,12 +54,23 @@ interface AppState {
   saveMeta: SaveMeta | null
   /** diff do último import feito sobre um save já carregado */
   lastDiff: ImportDiff | null
+  /** grupos excluídos do True 100% do usuário */
+  excluded: IdSet
+  /** rota planejada pela companion, desenhada no mapa */
+  route: RouteStep[] | null
+  /** chave Gemini (BYOK) da companion */
+  geminiKey: string
 
   setLang: (lang: 'en' | 'pt') => void
   setTheme: (theme: 'dark' | 'light') => void
   toggleManual: (groupId: string, itemId: string) => void
   setSaveResult: (fromSave: Progress, player: PlayerStats, meta: SaveMeta, diff: ImportDiff | null) => void
   clearSave: () => void
+  toggleExcluded: (groupId: string) => void
+  setRoute: (route: RouteStep[] | null) => void
+  setGeminiKey: (key: string) => void
+  /** restaura um backup JSON exportado */
+  restore: (snapshot: Partial<Pick<AppState, 'manual' | 'fromSave' | 'player' | 'saveMeta' | 'excluded'>>) => void
 }
 
 export const useAppStore = create<AppState>()(
@@ -63,6 +83,9 @@ export const useAppStore = create<AppState>()(
       player: null,
       saveMeta: null,
       lastDiff: null,
+      excluded: {},
+      route: null,
+      geminiKey: '',
 
       setLang: (lang) => set({ lang }),
       setTheme: (theme) => set({ theme }),
@@ -79,6 +102,16 @@ export const useAppStore = create<AppState>()(
       setSaveResult: (fromSave, player, meta, diff) =>
         set({ fromSave, player, saveMeta: meta, lastDiff: diff }),
       clearSave: () => set({ fromSave: {}, player: null, saveMeta: null, lastDiff: null }),
+      toggleExcluded: (groupId) =>
+        set((s) => {
+          const excluded = { ...s.excluded }
+          if (excluded[groupId]) delete excluded[groupId]
+          else excluded[groupId] = 1
+          return { excluded }
+        }),
+      setRoute: (route) => set({ route }),
+      setGeminiKey: (geminiKey) => set({ geminiKey }),
+      restore: (snapshot) => set(snapshot),
     }),
     { name: 'zonai-codex' },
   ),
