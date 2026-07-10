@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useDataset } from '../lib/useDataset'
 import { planRoute, progressBrief } from '../lib/planner'
 import { purahChatText } from '../lib/purah'
-import { activeAiConfig, ENV_GEMINI_KEY } from '../lib/ai'
+import { activeAiConfig, HOSTED_AI_AVAILABLE } from '../lib/ai'
 import { parseIntentLocal, parseIntentLLM, type Intent } from '../lib/intent'
 import { allArmorLabels, buildArmorPlan, type ArmorPlan } from '../lib/armorPlanner'
 import { buildRegionPlan, type RegionPlan } from '../lib/regionPlanner'
@@ -353,19 +353,22 @@ function AiSettings({ aiReady }: { aiReady: boolean }) {
 
         <label className="block text-[10px] uppercase tracking-widest text-ink-mute">
           {t('companion.provider')}
-          <select value={aiProvider} onChange={(e) => setAiProvider(e.target.value as 'gemini' | 'openai')} className="panel mt-1 w-full bg-stone-2 px-2 py-2 text-sm text-ink">
-            <option value="gemini">Google Gemini</option>
+          <select value={aiProvider} onChange={(e) => setAiProvider(e.target.value as 'hosted' | 'gemini' | 'openai')} className="panel mt-1 w-full bg-stone-2 px-2 py-2 text-sm text-ink">
+            {HOSTED_AI_AVAILABLE && <option value="hosted">{t('companion.providerHosted')}</option>}
+            <option value="gemini">Google Gemini (BYOK)</option>
             <option value="openai">OpenAI-compatible (OpenRouter / Groq / Ollama…)</option>
           </select>
         </label>
 
-        {aiProvider === 'gemini' ? (
+        {aiProvider === 'hosted' ? (
+          <p className="text-[10px] leading-relaxed" style={{ color: 'var(--color-jade)' }}>✓ {t('companion.hostedNote')}</p>
+        ) : aiProvider === 'gemini' ? (
           <>
             <label className="block text-[10px] uppercase tracking-widest text-ink-mute">
               {t('companion.apiKey')}
-              <input type="password" value={geminiKey} onChange={(e) => setGeminiKey(e.target.value)} placeholder={ENV_GEMINI_KEY ? t('companion.envKeyActive') : 'AIza…'} className={fieldCls} />
+              <input type="password" value={geminiKey} onChange={(e) => setGeminiKey(e.target.value)} placeholder="AIza…" className={fieldCls} />
             </label>
-            {ENV_GEMINI_KEY && !geminiKey && <p className="text-[10px]" style={{ color: 'var(--color-jade)' }}>✓ {t('companion.envKeyNote')}</p>}
+            {!geminiKey && HOSTED_AI_AVAILABLE && <p className="text-[10px]" style={{ color: 'var(--color-jade)' }}>✓ {t('companion.hostedFallbackNote')}</p>}
             <label className="block text-[10px] uppercase tracking-widest text-ink-mute">
               {t('companion.model')}
               <select value={aiModel} onChange={(e) => setAiModel(e.target.value)} className="panel mt-1 w-full bg-stone-2 px-2 py-2 text-sm text-ink">

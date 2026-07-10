@@ -58,8 +58,8 @@ interface AppState {
   excluded: IdSet
   /** rota planejada pela companion, desenhada no mapa */
   route: RouteStep[] | null
-  /** provider de IA da companion */
-  aiProvider: 'gemini' | 'openai'
+  /** provider de IA da companion ('hosted' = ai-proxy da suíte, sem chave) */
+  aiProvider: 'hosted' | 'gemini' | 'openai'
   /** chave Gemini (BYOK) da companion */
   geminiKey: string
   /** modelo Gemini usado pela companion */
@@ -82,7 +82,7 @@ interface AppState {
   setRoute: (route: RouteStep[] | null) => void
   setGeminiKey: (key: string) => void
   setAiModel: (model: string) => void
-  setAiProvider: (p: 'gemini' | 'openai') => void
+  setAiProvider: (p: 'hosted' | 'gemini' | 'openai') => void
   setOaiBaseUrl: (v: string) => void
   setOaiModel: (v: string) => void
   setOaiKey: (v: string) => void
@@ -104,7 +104,7 @@ export const useAppStore = create<AppState>()(
       lastDiff: null,
       excluded: {},
       route: null,
-      aiProvider: 'gemini' as const,
+      aiProvider: 'hosted' as const,
       geminiKey: '',
       aiModel: 'gemini-flash-latest',
       oaiBaseUrl: 'https://openrouter.ai/api/v1',
