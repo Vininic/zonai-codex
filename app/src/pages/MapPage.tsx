@@ -39,6 +39,7 @@ export function MapPage() {
   const fromSave = useAppStore((s) => s.fromSave)
   const route = useAppStore((s) => s.route)
   const player = useAppStore((s) => s.player)
+  const collapsed = useAppStore((s) => s.sidebarCollapsed)
 
   const [layer, setLayer] = useState<MapLayer>('surface')
   const [hideDone, setHideDone] = useState(false)
@@ -95,7 +96,7 @@ export function MapPage() {
       [0, 0],
       [H, W],
     ])
-    L.control.zoom({ position: 'bottomright' }).addTo(map)
+    L.control.zoom({ position: 'topright' }).addTo(map)
     mapRef.current = map
     markersRef.current = L.layerGroup().addTo(map)
     routeRef.current = L.layerGroup().addTo(map)
@@ -202,6 +203,12 @@ export function MapPage() {
     map.fitBounds(L.latLngBounds(latlngs).pad(0.2))
   }, [route, player, layer])
 
+  // sidebar recolhe/expande → leaflet precisa remedir o container
+  useEffect(() => {
+    const id = setTimeout(() => mapRef.current?.invalidateSize(), 250)
+    return () => clearTimeout(id)
+  }, [collapsed])
+
   const toggleCat = (id: string) => {
     setVisible((prev) => {
       const next = new Set(prev)
@@ -212,7 +219,7 @@ export function MapPage() {
   }
 
   return (
-    <div className="relative -mx-4 lg:mx-0 lg:overflow-hidden lg:border lg:border-edge" style={{ height: 'calc(100dvh - 148px)' }}>
+    <div className={`fixed inset-0 z-30 ${collapsed ? 'lg:left-16' : 'lg:left-56'}`}>
       <div ref={containerRef} className="h-full w-full" style={{ background: 'var(--color-abyss)' }} />
 
       {/* controles topo: botão de filtros/legenda + esconder feitos */}
@@ -227,7 +234,7 @@ export function MapPage() {
 
       {/* painel filtro+legenda */}
       {panelOpen && (
-        <div className="absolute bottom-16 left-3 top-14 z-[1000] w-64 overflow-y-auto border border-edge bg-stone/95 p-3 backdrop-blur-sm lg:bottom-4">
+        <div className="absolute bottom-32 left-3 top-14 z-[1000] w-64 overflow-y-auto border border-edge bg-stone/95 p-3 backdrop-blur-sm lg:bottom-14">
           <div className="mb-2 flex gap-1.5">
             <button
               onClick={() => setVisible(new Set(data.categories.map((c) => c.id)))}
@@ -272,7 +279,7 @@ export function MapPage() {
       )}
 
       {/* switch de camada */}
-      <div className="absolute bottom-4 left-3 z-[999] flex gap-1 lg:flex-col">
+      <div className="absolute bottom-20 left-3 z-[999] flex gap-1 lg:bottom-4 lg:flex-col">
         {LAYERS.map((l) => (
           <button
             key={l}

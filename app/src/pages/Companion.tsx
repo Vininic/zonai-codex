@@ -7,6 +7,7 @@ import { purahChatText } from '../lib/purah'
 import { parseIntentLocal, parseIntentLLM, type Intent } from '../lib/intent'
 import { allArmorLabels, buildArmorPlan, type ArmorPlan } from '../lib/armorPlanner'
 import { categoryMeta } from '../lib/categoryMeta'
+import { computeProgress } from '../lib/useDataset'
 import { useAppStore, type RouteStep } from '../store/appStore'
 
 interface CollectPlan {
@@ -20,7 +21,11 @@ interface ArmorPlanMsg {
   type: 'armor'
   plan: ArmorPlan
 }
-type Plan = CollectPlan | ArmorPlanMsg
+interface SummaryPlan {
+  type: 'summary'
+  rows: { id: string; name: string; done: number; total: number }[]
+}
+type Plan = CollectPlan | ArmorPlanMsg | SummaryPlan
 
 interface Msg {
   role: 'user' | 'purah'
@@ -35,7 +40,8 @@ export function Companion() {
   const fromSave = useAppStore((s) => s.fromSave)
   const player = useAppStore((s) => s.player)
   const geminiKey = useAppStore((s) => s.geminiKey)
-  const setGeminiKey = useAppStore((s) => s.setGeminiKey)
+  const aiModel = useAppStore((s) => s.aiModel)
+  const aiNarration = useAppStore((s) => s.aiNarration)
   const lang = useAppStore((s) => s.lang)
 
   const [messages, setMessages] = useState<Msg[]>([])
@@ -52,20 +58,22 @@ export function Companion() {
     return (data.categories.find((c) => c.id === id) ?? data.stats.find((s) => s.id === id))?.label ?? id
   }
 
+  // sugestões guiadas dinâmicas (6): coletas incompletas, armadura, resumo
   const suggestions = useMemo(() => {
+    const groups = computeProgress(data, manual, fromSave)
     const out: string[] = []
-    for (const id of ['koroks', 'shrines', 'bubbulfrogs', 'old_map']) {
-      const cat = data.categories.find((c) => c.id === id)
-      if (!cat) continue
-      const done = cat.items.filter((i) => manual[id]?.[i.id] || fromSave[id]?.[i.id]).length
-      if (done < cat.items.length) out.push(t('companion.suggestCollect', { name: groupName(id) }))
-      if (out.length >= 2) break
-    }
+    const incompleteCats = groups
+      .filter((g) => g.isMarkerCategory && g.done < g.total)
+      .sort((a, b) => a.done / a.total - b.done / b.total)
+    for (const g of incompleteCats.slice(0, 3)) out.push(t('companion.suggestCollect', { name: groupName(g.id) }))
     const upg = data.stats.find((s) => s.id === 'armor_upgraded')
     const notMax = upg?.items.find((i) => !(manual['armor_upgraded']?.[i.id] || fromSave['armor_upgraded']?.[i.id]))
     if (notMax) out.push(t('companion.suggestArmor', { name: notMax.label ?? notMax.id }))
-    if (out.length === 0) out.push(t('companion.suggestArmor', { name: armorLabels[0] ?? 'Hylian Hood' }))
-    return out.slice(0, 3)
+    out.push(t('companion.suggestSummary'))
+    const bosses = incompleteCats.find((g) => ['gleeok', 'hinox', 'dungeon_bosses', 'frox', 'stone_talus'].includes(g.id))
+    if (bosses && out.length < 6) out.push(t('companion.suggestCollect', { name: groupName(bosses.id) }))
+    if (out.length < 6 && armorLabels[0]) out.push(t('companion.suggestArmor', { name: armorLabels[0] }))
+    return [...new Set(out)].slice(0, 6)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, manual, fromSave, t])
 
@@ -92,16 +100,27 @@ export function Companion() {
     return { type: 'collect', categoryId, pendingTotal, layer, steps }
   }
 
+  function buildSummaryPlan(): SummaryPlan {
+    const groups = computeProgress(data, manual, fromSave)
+    const rows = groups
+      .filter((g) => g.done < g.total)
+      .sort((a, b) => a.done / a.total - b.done / b.total)
+      .slice(0, 8)
+      .map((g) => ({ id: g.id, name: groupName(g.id), done: g.done, total: g.total }))
+    return { type: 'summary', rows }
+  }
+
   async function handleAsk(text: string) {
     if (!text.trim() || busy) return
     setBusy(true)
     setInput('')
     setMessages((prev) => [...prev, { role: 'user', text }])
+    requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }))
 
     let intent: Intent = parseIntentLocal(text, armorLabels)
     if (intent.kind === 'unknown' && geminiKey) {
       try {
-        intent = await parseIntentLLM(geminiKey, text, data.categories.map((c) => c.id), armorLabels)
+        intent = await parseIntentLLM(geminiKey, text, data.categories.map((c) => c.id), armorLabels, aiModel)
       } catch {
         /* fica unknown */
       }
@@ -130,8 +149,13 @@ export function Companion() {
             ? t('companion.armorMaxed', { name: p.label })
             : t('companion.armorReply', { name: p.label, stars: p.currentStars ?? '?' })
           : t('companion.armorNotOwned', { name: p.label })
-        narrationContext = `Armor plan for ${p.label}: owned=${p.owned}, stars=${p.currentStars}, levels remaining=${p.levels.map((l) => l.level).join(',')}, totals=${p.totals.map((c) => `${c.qty}x ${c.material}${c.owned !== null ? ` (have ${c.owned})` : ''}`).join('; ')}`
+        narrationContext = `Armor plan for ${p.label}: owned=${p.owned}, stars=${p.currentStars}, totals=${p.totals.map((c) => `${c.qty}x ${c.material}${c.owned !== null ? ` (have ${c.owned})` : ''}`).join('; ')}`
       }
+    } else if (intent.kind === 'summary') {
+      const p = buildSummaryPlan()
+      plan = p
+      reply = p.rows.length === 0 ? t('companion.summaryPerfect') : t('companion.summaryReply', { count: p.rows.length })
+      narrationContext = `Summary of what's left: ${p.rows.map((r) => `${r.name} ${r.done}/${r.total}`).join('; ')}`
     }
 
     if (!plan) reply = t('companion.unknown')
@@ -140,9 +164,14 @@ export function Companion() {
     setBusy(false)
     requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }))
 
-    if (plan && geminiKey && narrationContext) {
+    if (plan && geminiKey && aiNarration && narrationContext) {
       try {
-        const narration = await purahChatText(geminiKey, lang, `${narrationContext}\nOverall progress: ${progressBrief(data, manual, fromSave).slice(0, 800)}`)
+        const narration = await purahChatText(
+          geminiKey,
+          lang,
+          `${narrationContext}\nOverall progress: ${progressBrief(data, manual, fromSave).slice(0, 800)}`,
+          aiModel,
+        )
         setMessages((prev) => [...prev, { role: 'purah', text: narration }])
         requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }))
       } catch {
@@ -151,79 +180,79 @@ export function Companion() {
     }
   }
 
+  const empty = messages.length === 0
+
   return (
-    <div className="mx-auto flex h-[calc(100dvh-160px)] max-w-4xl flex-col lg:h-[calc(100dvh-120px)]">
-      {/* header Purah */}
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <PurahAvatar size={44} />
-          <div>
-            <h2 className="font-display text-lg leading-tight">Purah</h2>
-            <p className="text-[11px] text-ink-mute">{t('companion.tagline')}</p>
+    <div className="mx-auto flex h-[calc(100dvh-190px)] max-w-4xl flex-col lg:h-[calc(100dvh-110px)]">
+      {/* topo: identidade + config IA */}
+      <div className="mb-2 flex items-center justify-between">
+        {!empty ? (
+          <div className="flex items-center gap-2.5">
+            <PurahFace size={34} />
+            <span className="font-display">Purah</span>
           </div>
+        ) : (
+          <span />
+        )}
+        <AiSettings />
+      </div>
+
+      {/* área central */}
+      {empty ? (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-hidden text-center sm:gap-4">
+          <img
+            src="/purah.png"
+            alt="Purah"
+            className="h-32 min-h-0 shrink object-contain sm:h-64"
+            style={{ filter: 'drop-shadow(0 0 24px rgba(87,230,192,.35))' }}
+          />
+          <h2 className="font-display text-xl sm:text-3xl">{t('companion.heroTitle')}</h2>
+          <p className="max-w-md text-xs text-ink-mute sm:text-sm">{t('companion.heroSub')}</p>
         </div>
-        <details className="relative">
-          <summary className="panel cursor-pointer list-none px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wide text-ink-mute hover:text-jade">
-            ⚙ {t('companion.byokShort')}
-          </summary>
-          <div className="absolute right-0 z-20 mt-2 w-72 border border-edge bg-stone p-3">
-            <p className="text-[11px] text-ink-faint">{t('companion.byokHint')}</p>
-            <input
-              type="password"
-              value={geminiKey}
-              onChange={(e) => setGeminiKey(e.target.value)}
-              placeholder="AIza…"
-              className="panel mt-2 w-full bg-stone-2 px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-faint focus:outline-none"
-            />
-          </div>
-        </details>
-      </div>
-
-      {/* mensagens */}
-      <div className="panel flex-1 space-y-3 overflow-y-auto p-4">
-        {messages.length === 0 && (
-          <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-            <PurahAvatar size={64} />
-            <p className="max-w-sm text-sm text-ink-mute">{t('companion.hello')}</p>
-          </div>
-        )}
-        {messages.map((m, i) =>
-          m.role === 'user' ? (
-            <div key={i} className="flex justify-end">
-              <div className="max-w-[85%] bg-stone-2 px-3.5 py-2 text-sm" style={{ clipPath: 'polygon(8px 0, 100% 0, 100% 100%, 0 100%, 0 8px)' }}>
-                {m.text}
+      ) : (
+        <div className="panel flex-1 space-y-4 overflow-y-auto p-4">
+          {messages.map((m, i) =>
+            m.role === 'user' ? (
+              <div key={i} className="flex justify-end">
+                <div className="max-w-[85%] bg-stone-2 px-3.5 py-2 text-sm" style={{ clipPath: 'polygon(8px 0, 100% 0, 100% 100%, 0 100%, 0 8px)' }}>
+                  {m.text}
+                </div>
               </div>
-            </div>
-          ) : (
-            <div key={i} className="flex items-start gap-2.5">
-              <PurahAvatar size={26} />
-              <div className="min-w-0 max-w-[90%] space-y-2">
-                {m.text && <p className="whitespace-pre-wrap text-sm leading-relaxed">{m.text}</p>}
-                {m.plan?.type === 'collect' && <CollectPlanCard plan={m.plan} groupName={groupName} />}
-                {m.plan?.type === 'armor' && <ArmorPlanCard plan={m.plan.plan} />}
+            ) : (
+              <div key={i} className="flex items-start gap-2.5">
+                <PurahFace size={30} />
+                <div className="min-w-0 max-w-[90%] space-y-2">
+                  {m.text && <p className="whitespace-pre-wrap text-sm leading-relaxed">{m.text}</p>}
+                  {m.plan?.type === 'collect' && <CollectPlanCard plan={m.plan} groupName={groupName} />}
+                  {m.plan?.type === 'armor' && <ArmorPlanCard plan={m.plan.plan} />}
+                  {m.plan?.type === 'summary' && <SummaryCard plan={m.plan} />}
+                </div>
               </div>
-            </div>
-          ),
-        )}
-        {busy && <p className="text-xs text-ink-faint">{t('companion.thinking')}</p>}
-        <div ref={endRef} />
-      </div>
+            ),
+          )}
+          {busy && <p className="text-xs text-ink-faint">{t('companion.thinking')}</p>}
+          <div ref={endRef} />
+        </div>
+      )}
 
-      {/* sugestões + input */}
-      <div className="mt-3 space-y-2">
-        <div className="flex flex-wrap gap-1.5">
-          {suggestions.map((s) => (
+      {/* sugestões + input (embaixo, como na referência) */}
+      <div className="mt-4 space-y-2.5">
+        <p className="text-[10px] font-medium uppercase tracking-widest text-ink-faint">{t('companion.suggestionsLabel')}</p>
+        <div className={`gap-2 ${empty ? 'grid grid-cols-1 sm:grid-cols-3' : 'flex flex-wrap'}`}>
+          {(empty ? suggestions : suggestions.slice(0, 3)).map((s, i) => (
             <button
               key={s}
               onClick={() => handleAsk(s)}
-              className="border border-edge px-2.5 py-1 text-[11px] text-ink-mute transition-colors hover:border-edge-lit hover:text-jade"
+              className={`panel text-left text-ink-mute transition-all hover:border-edge-lit hover:text-ink ${
+                empty ? `px-3.5 py-3 text-sm ${i >= 3 ? 'hidden sm:block' : ''}` : 'px-2.5 py-1.5 text-[11px]'
+              }`}
             >
               {s}
             </button>
           ))}
         </div>
         <form
-          className="flex gap-2"
+          className="panel flex items-center gap-2 pr-2"
           onSubmit={(e) => {
             e.preventDefault()
             handleAsk(input)
@@ -233,14 +262,97 @@ export function Companion() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={t('companion.placeholder')}
-            className="panel min-w-0 flex-1 bg-stone px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-faint focus:outline-none"
+            className="min-w-0 flex-1 bg-transparent px-4 py-3.5 text-sm text-ink placeholder:text-ink-faint focus:outline-none"
           />
-          <button type="submit" disabled={busy || !input.trim()} className="btn-jade disabled:opacity-40">
-            {t('companion.send')}
+          <button
+            type="submit"
+            disabled={busy || !input.trim()}
+            aria-label={t('companion.send')}
+            className="flex h-9 w-9 items-center justify-center transition-transform active:scale-90 disabled:opacity-30"
+            style={{ background: 'var(--color-jade)', color: 'var(--color-abyss)', clipPath: 'polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px)', boxShadow: 'var(--glow-jade)' }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 12h16M13 5l7 7-7 7" />
+            </svg>
           </button>
         </form>
       </div>
     </div>
+  )
+}
+
+function AiSettings() {
+  const { t } = useTranslation()
+  const geminiKey = useAppStore((s) => s.geminiKey)
+  const setGeminiKey = useAppStore((s) => s.setGeminiKey)
+  const aiModel = useAppStore((s) => s.aiModel)
+  const setAiModel = useAppStore((s) => s.setAiModel)
+  const aiNarration = useAppStore((s) => s.aiNarration)
+  const setAiNarration = useAppStore((s) => s.setAiNarration)
+
+  return (
+    <details className="relative">
+      <summary className="panel flex cursor-pointer list-none items-center gap-1.5 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wide text-ink-mute hover:text-jade">
+        ⚙ {t('companion.byokShort')}
+        <span className="h-1.5 w-1.5 rounded-full" style={{ background: geminiKey ? 'var(--color-jade)' : 'var(--color-ink-faint)' }} />
+      </summary>
+      <div className="absolute right-0 z-30 mt-2 w-80 space-y-3 border border-edge bg-stone p-4">
+        <p className="text-[11px] leading-relaxed text-ink-faint">{t('companion.byokHint')}</p>
+        <label className="block text-[10px] uppercase tracking-widest text-ink-mute">
+          {t('companion.apiKey')}
+          <input
+            type="password"
+            value={geminiKey}
+            onChange={(e) => setGeminiKey(e.target.value)}
+            placeholder="AIza…"
+            className="panel mt-1 w-full bg-stone-2 px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-faint focus:outline-none"
+          />
+        </label>
+        <label className="block text-[10px] uppercase tracking-widest text-ink-mute">
+          {t('companion.model')}
+          <select
+            value={aiModel}
+            onChange={(e) => setAiModel(e.target.value)}
+            className="panel mt-1 w-full bg-stone-2 px-2 py-2 text-sm text-ink"
+          >
+            <option value="gemini-2.5-flash">Gemini 2.5 Flash ({t('companion.modelFast')})</option>
+            <option value="gemini-2.5-pro">Gemini 2.5 Pro ({t('companion.modelSmart')})</option>
+            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite ({t('companion.modelLite')})</option>
+          </select>
+        </label>
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-ink-mute">
+          <input type="checkbox" checked={aiNarration} onChange={(e) => setAiNarration(e.target.checked)} className="h-3.5 w-3.5 accent-(--color-jade)" />
+          {t('companion.narration')}
+        </label>
+      </div>
+    </details>
+  )
+}
+
+/** rosto da Purah (render oficial recortado); fallback = runa Zonai */
+function PurahFace({ size }: { size: number }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" stroke="var(--color-jade)" strokeWidth="4" aria-hidden className="shrink-0">
+        <circle cx="50" cy="50" r="40" strokeDasharray="5 7" strokeLinecap="round" />
+        <circle cx="50" cy="50" r="7" fill="var(--color-jade)" stroke="none" />
+      </svg>
+    )
+  }
+  return (
+    <span
+      className="inline-block shrink-0 overflow-hidden rounded-full border border-edge-lit"
+      style={{ width: size, height: size, boxShadow: 'var(--glow-jade)' }}
+    >
+      <img
+        src="/purah.png"
+        alt="Purah"
+        onError={() => setFailed(true)}
+        className="h-full w-full object-cover"
+        style={{ objectPosition: '50% 12%', transform: 'scale(1.6)', transformOrigin: '50% 18%' }}
+      />
+    </span>
   )
 }
 
@@ -279,6 +391,30 @@ function CollectPlanCard({ plan, groupName }: { plan: CollectPlan; groupName: (i
       >
         {t('companion.showOnMap')}
       </button>
+    </div>
+  )
+}
+
+function SummaryCard({ plan }: { plan: SummaryPlan }) {
+  return (
+    <div className="panel space-y-2 p-3">
+      {plan.rows.map((r) => {
+        const meta = categoryMeta(r.id)
+        const frac = r.total ? r.done / r.total : 0
+        return (
+          <div key={r.id} className="flex items-center gap-2.5 text-xs">
+            {meta.icon ? <img src={meta.icon} alt="" className="h-4 w-4 object-contain" /> : <span className="h-2 w-2 rounded-full" style={{ background: meta.color }} />}
+            <span className="w-40 min-w-0 truncate text-ink-mute">{r.name}</span>
+            <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-stone-2">
+              <div className="h-full rounded-full" style={{ width: `${frac * 100}%`, background: meta.color }} />
+            </div>
+            <span className="shrink-0 font-mono text-[11px]" style={{ color: meta.color }}>
+              {r.done}
+              <span className="text-ink-faint">/{r.total}</span>
+            </span>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -360,15 +496,5 @@ function MaterialRow({ cost }: { cost: { material: string; qty: number; owned: n
         <span className="text-ink-faint">/{cost.qty}</span>
       </span>
     </div>
-  )
-}
-
-function PurahAvatar({ size }: { size: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" stroke="var(--color-jade)" strokeWidth="3" aria-hidden className="shrink-0">
-      <circle cx="50" cy="50" r="40" strokeDasharray="5 7" strokeLinecap="round" />
-      <circle cx="50" cy="50" r="24" />
-      <circle cx="50" cy="50" r="7" fill="var(--color-jade)" stroke="none" style={{ filter: 'drop-shadow(0 0 6px var(--color-jade))' }} />
-    </svg>
   )
 }

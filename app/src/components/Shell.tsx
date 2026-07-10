@@ -17,6 +17,8 @@ export function Shell() {
   const theme = useAppStore((s) => s.theme)
   const setLang = useAppStore((s) => s.setLang)
   const setTheme = useAppStore((s) => s.setTheme)
+  const collapsed = useAppStore((s) => s.sidebarCollapsed)
+  const toggleSidebar = useAppStore((s) => s.toggleSidebar)
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -47,22 +49,27 @@ export function Shell() {
 
   return (
     <div className="min-h-dvh lg:flex">
-      {/* sidebar desktop */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-56 flex-col border-r border-edge bg-stone/60 lg:flex">
-        <div className="flex items-center gap-2.5 px-5 pb-6 pt-6">
-          <img src="/icon.svg" alt="" className="h-8 w-8" />
-          <span className="font-display text-lg leading-none">
-            Zonai <span className="text-jade">Codex</span>
-          </span>
+      {/* sidebar desktop (colapsável) */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-edge bg-stone/60 transition-[width] duration-200 lg:flex ${collapsed ? 'w-16' : 'w-56'}`}
+      >
+        <div className={`flex items-center gap-2.5 pb-6 pt-6 ${collapsed ? 'justify-center px-0' : 'px-5'}`}>
+          <img src="/icon.svg" alt="" className="h-8 w-8 shrink-0" />
+          {!collapsed && (
+            <span className="font-display text-lg leading-none">
+              Zonai <span className="text-jade">Codex</span>
+            </span>
+          )}
         </div>
-        <nav className="flex flex-1 flex-col gap-1 px-3">
+        <nav className={`flex flex-1 flex-col gap-1 ${collapsed ? 'px-2' : 'px-3'}`}>
           {NAV.map(({ to, key, icon: Icon }) => (
             <NavLink
               key={key}
               to={to}
               end={to === '/'}
+              title={t(`nav.${key}`)}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-none px-3 py-2.5 text-sm transition-colors ${
+                `flex items-center gap-3 rounded-none py-2.5 text-sm transition-colors ${collapsed ? 'justify-center px-0' : 'px-3'} ${
                   isActive ? 'bg-stone-2 text-jade' : 'text-ink-mute hover:bg-stone-2/60 hover:text-ink'
                 }`
               }
@@ -71,16 +78,26 @@ export function Shell() {
               {({ isActive }) => (
                 <>
                   <Icon active={isActive} />
-                  <span className="uppercase tracking-wider text-xs">{t(`nav.${key}`)}</span>
+                  {!collapsed && <span className="uppercase tracking-wider text-xs">{t(`nav.${key}`)}</span>}
                 </>
               )}
             </NavLink>
           ))}
         </nav>
-        <div className="px-5 pb-6">{toggles}</div>
+        <div className={`flex flex-col gap-3 pb-4 ${collapsed ? 'items-center px-0' : 'px-5'}`}>
+          {!collapsed && toggles}
+          <button
+            onClick={toggleSidebar}
+            className="panel px-2.5 py-1.5 font-mono text-xs text-ink-mute transition-colors hover:text-jade"
+            aria-label="Collapse sidebar"
+            title={collapsed ? '»' : '«'}
+          >
+            {collapsed ? '»' : '« '}
+          </button>
+        </div>
       </aside>
 
-      <div className="flex min-h-dvh w-full flex-col lg:pl-56">
+      <div className={`flex min-h-dvh w-full flex-col ${collapsed ? 'lg:pl-16' : 'lg:pl-56'}`}>
         {/* header mobile */}
         <header className="flex items-center justify-between px-4 pb-2 pt-4 lg:hidden">
           <h1 className="font-display text-xl text-ink">

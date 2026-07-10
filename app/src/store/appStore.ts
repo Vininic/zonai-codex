@@ -60,6 +60,12 @@ interface AppState {
   route: RouteStep[] | null
   /** chave Gemini (BYOK) da companion */
   geminiKey: string
+  /** modelo Gemini usado pela companion */
+  aiModel: string
+  /** Purah narra os planos com a IA (quando há chave) */
+  aiNarration: boolean
+  /** sidebar desktop recolhida (só ícones) */
+  sidebarCollapsed: boolean
 
   setLang: (lang: 'en' | 'pt') => void
   setTheme: (theme: 'dark' | 'light') => void
@@ -69,6 +75,9 @@ interface AppState {
   toggleExcluded: (groupId: string) => void
   setRoute: (route: RouteStep[] | null) => void
   setGeminiKey: (key: string) => void
+  setAiModel: (model: string) => void
+  setAiNarration: (on: boolean) => void
+  toggleSidebar: () => void
   /** restaura um backup JSON exportado */
   restore: (snapshot: Partial<Pick<AppState, 'manual' | 'fromSave' | 'player' | 'saveMeta' | 'excluded'>>) => void
 }
@@ -86,6 +95,9 @@ export const useAppStore = create<AppState>()(
       excluded: {},
       route: null,
       geminiKey: '',
+      aiModel: 'gemini-2.5-flash',
+      aiNarration: true,
+      sidebarCollapsed: false,
 
       setLang: (lang) => set({ lang }),
       setTheme: (theme) => set({ theme }),
@@ -111,6 +123,9 @@ export const useAppStore = create<AppState>()(
         }),
       setRoute: (route) => set({ route }),
       setGeminiKey: (geminiKey) => set({ geminiKey }),
+      setAiModel: (aiModel) => set({ aiModel }),
+      setAiNarration: (aiNarration) => set({ aiNarration }),
+      toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       restore: (snapshot) => set(snapshot),
     }),
     { name: 'zonai-codex' },

@@ -15,7 +15,7 @@ const M: Record<string, CategoryMeta> = {
   lightroots: { color: '#8ae657', icon: '/icons/lightroot.png' },
   caves: { color: '#b98ae6', icon: '/icons/cave.png' },
   bubbulfrogs: { color: '#e657d0', icon: '/icons/monster.png' },
-  hudson_sign: { color: '#e6a957', icon: '/icons/hudsonsign.png' },
+  hudson_sign: { color: '#e6a957', icon: '/icons/hudsonsign.svg' },
   dungeon_bosses: { color: '#e65757', icon: '/icons/skull.png' },
   flux_construct: { color: '#57cfe6', icon: '/icons/square.png' },
   hinox: { color: '#d95d6a', icon: '/icons/hinox.svg' },

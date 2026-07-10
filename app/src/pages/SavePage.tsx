@@ -93,68 +93,83 @@ export function SavePage() {
     <div className="space-y-4">
       <h2 className="font-display text-lg">{t('save.title')}</h2>
 
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-      <div className="space-y-4">
-      <section className="panel space-y-3 p-4">
-        <h3 className="font-display text-sm uppercase tracking-widest text-ink-mute">{t('save.importTitle')}</h3>
-        <p className="text-sm text-ink-mute">{t('save.importHint')}</p>
-        <input ref={fileRef} type="file" accept=".sav" className="hidden" onChange={(e) => onFile(e.target.files)} />
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => fileRef.current?.click()} disabled={busy} className="btn-jade">
-            {t('save.chooseFile')}
-          </button>
-          <button onClick={loadDemo} disabled={busy} className="panel px-4 py-2.5 text-sm text-ink-mute transition-colors hover:text-jade">
-            {t('save.loadDemo')}
-          </button>
-        </div>
-        {error && <p className="text-sm" style={{ color: 'var(--color-gloom)' }}>{error}</p>}
-      </section>
-
-      {lastDiff && <DiffView diff={lastDiff} />}
-      </div>
-
-      <div className="space-y-4">
+      {/* faixa de status do save carregado */}
       {saveMeta && (
-        <section className="panel space-y-2 p-4">
-          <h3 className="font-display text-sm uppercase tracking-widest" style={{ color: 'var(--color-jade)' }}>
+        <section className="panel flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+          <span className="flex items-center gap-2 font-display text-xs uppercase tracking-widest" style={{ color: 'var(--color-jade)' }}>
+            <span className="h-2 w-2 rounded-full" style={{ background: 'var(--color-jade)', boxShadow: 'var(--glow-jade)' }} />
             {t('save.loaded')}
-          </h3>
-          <dl className="grid grid-cols-2 gap-y-1 font-mono text-xs text-ink-mute">
-            <dt>{t('save.version')}</dt>
-            <dd className="text-right text-ink">{saveMeta.version}</dd>
-            <dt>{t('save.importedAt')}</dt>
-            <dd className="text-right text-ink">{new Date(saveMeta.importedAt).toLocaleString()}</dd>
-            <dt>{saveMeta.fileName}</dt>
-            <dd className="text-right" style={{ color: 'var(--color-jade)' }}>
-              {detectedTotal.toLocaleString()} ✓
-            </dd>
-          </dl>
-          <button onClick={clearSave} className="pt-1 text-xs text-ink-faint underline-offset-2 hover:underline">
+          </span>
+          <StatusCell label={t('save.version')} value={saveMeta.version} />
+          <StatusCell label={t('save.importedAt')} value={new Date(saveMeta.importedAt).toLocaleString()} />
+          <StatusCell label={saveMeta.fileName} value={`${detectedTotal.toLocaleString()} ✓`} accent />
+          <button onClick={clearSave} className="ml-auto text-xs text-ink-faint underline-offset-2 hover:underline">
             {t('save.clear')}
           </button>
         </section>
       )}
 
-      {saveMeta && <EditorSection onExported={importBuffer} />}
+      <div className="grid items-start gap-4 lg:grid-cols-3">
+        {/* coluna de ações */}
+        <div className="space-y-4">
+          <section className="panel space-y-3 p-4">
+            <h3 className="font-display text-sm uppercase tracking-widest text-ink-mute">{t('save.importTitle')}</h3>
+            <p className="text-sm text-ink-mute">{t('save.importHint')}</p>
+            <input ref={fileRef} type="file" accept=".sav" className="hidden" onChange={(e) => onFile(e.target.files)} />
+            <div className="flex flex-col gap-2">
+              <button onClick={() => fileRef.current?.click()} disabled={busy} className="btn-jade">
+                {t('save.chooseFile')}
+              </button>
+              <button onClick={loadDemo} disabled={busy} className="panel px-4 py-2.5 text-sm text-ink-mute transition-colors hover:text-jade">
+                {t('save.loadDemo')}
+              </button>
+            </div>
+            {error && <p className="text-sm" style={{ color: 'var(--color-gloom)' }}>{error}</p>}
+          </section>
 
-      <section className="panel space-y-2 p-4">
-        <h3 className="font-display text-sm uppercase tracking-widest text-ink-mute">{t('save.backupTitle')}</h3>
-        <p className="text-sm text-ink-faint">{t('save.backupHint')}</p>
-        <input ref={jsonRef} type="file" accept=".json" className="hidden" onChange={(e) => importProgressJson(e.target.files)} />
-        <div className="flex flex-wrap gap-2">
-          <button onClick={exportProgressJson} className="panel px-3 py-2 text-xs text-ink-mute hover:text-jade">
-            {t('save.exportJson')}
-          </button>
-          <button onClick={() => jsonRef.current?.click()} className="panel px-3 py-2 text-xs text-ink-mute hover:text-jade">
-            {t('save.importJson')}
-          </button>
+          <section className="panel space-y-2 p-4">
+            <h3 className="font-display text-sm uppercase tracking-widest text-ink-mute">{t('save.backupTitle')}</h3>
+            <p className="text-xs text-ink-faint">{t('save.backupHint')}</p>
+            <input ref={jsonRef} type="file" accept=".json" className="hidden" onChange={(e) => importProgressJson(e.target.files)} />
+            <div className="flex flex-wrap gap-2">
+              <button onClick={exportProgressJson} className="panel px-3 py-2 text-xs text-ink-mute hover:text-jade">
+                {t('save.exportJson')}
+              </button>
+              <button onClick={() => jsonRef.current?.click()} className="panel px-3 py-2 text-xs text-ink-mute hover:text-jade">
+                {t('save.importJson')}
+              </button>
+            </div>
+          </section>
         </div>
-      </section>
-      </div>
+
+        {/* coluna principal: editor + diff */}
+        <div className="space-y-4 lg:col-span-2">
+          {saveMeta ? (
+            <EditorSection onExported={importBuffer} />
+          ) : (
+            <section className="panel flex min-h-44 flex-col items-center justify-center gap-3 p-6 text-center">
+              <svg width="52" height="52" viewBox="0 0 100 100" fill="none" stroke="var(--color-edge-lit)" strokeWidth="2" aria-hidden>
+                <circle cx="50" cy="50" r="40" strokeDasharray="4 7" />
+                <circle cx="50" cy="50" r="5" fill="var(--color-jade)" stroke="none" />
+              </svg>
+              <p className="max-w-sm text-sm text-ink-mute">{t('save.emptyState')}</p>
+            </section>
+          )}
+          {lastDiff && <DiffView diff={lastDiff} />}
+        </div>
       </div>
 
       <p className="text-center text-[10px] text-ink-faint">{t('common.credits')}</p>
     </div>
+  )
+}
+
+function StatusCell({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <span className="flex items-baseline gap-2 font-mono text-xs">
+      <span className="text-ink-faint">{label}</span>
+      <span style={{ color: accent ? 'var(--color-jade)' : 'var(--color-ink)' }}>{value}</span>
+    </span>
   )
 }
 

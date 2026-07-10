@@ -6,6 +6,7 @@
 export type Intent =
   | { kind: 'armor'; label: string }
   | { kind: 'collect'; categoryId: string }
+  | { kind: 'summary' }
   | { kind: 'unknown' }
 
 const CATEGORY_ALIASES: Record<string, string[]> = {
@@ -44,6 +45,10 @@ function norm(s: string): string {
 export function parseIntentLocal(text: string, armorLabels: string[]): Intent {
   const q = norm(text)
 
+  if (/(what'?s left|whats left|o que falta|falta pra|resumo|overview|progress(o)? geral|situacao)/.test(q)) {
+    return { kind: 'summary' }
+  }
+
   // armadura: melhor label cujas palavras significativas aparecem no texto
   const armorish = /(armor|armadura|upgrade|upar|estrela|star|4\s*★|set)/.test(q)
   let best: { label: string; score: number } | null = null
@@ -78,16 +83,17 @@ export async function parseIntentLLM(
   text: string,
   categoryIds: string[],
   armorLabels: string[],
+  model = 'gemini-2.5-flash',
 ): Promise<Intent> {
   const prompt = [
     'Classify a Zelda TOTK completion-helper request into JSON. Reply ONLY minified JSON, no markdown.',
     `Categories: ${categoryIds.join(', ')}`,
     `Armor labels: ${armorLabels.join(' | ')}`,
-    'Schema: {"kind":"armor","label":"<exact armor label>"} OR {"kind":"collect","categoryId":"<exact category id>"} OR {"kind":"unknown"}',
+    'Schema: {"kind":"armor","label":"<exact armor label>"} OR {"kind":"collect","categoryId":"<exact category id>"} OR {"kind":"summary"} OR {"kind":"unknown"}',
     `Request: ${text}`,
   ].join('\n')
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

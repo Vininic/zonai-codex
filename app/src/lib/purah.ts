@@ -1,7 +1,7 @@
 import type { RouteStep } from '../store/appStore'
 
 /** narração livre da Purah sobre um contexto de plano (chat) */
-export async function purahChatText(apiKey: string, lang: 'en' | 'pt', context: string): Promise<string> {
+export async function purahChatText(apiKey: string, lang: 'en' | 'pt', context: string, model = 'gemini-2.5-flash'): Promise<string> {
   const language = lang === 'pt' ? 'Brazilian Portuguese' : 'English'
   const prompt = [
     `You are Purah from Zelda: Tears of the Kingdom — brilliant, energetic Sheikah researcher, fully in character ("Check it!").`,
@@ -10,7 +10,7 @@ export async function purahChatText(apiKey: string, lang: 'en' | 'pt', context: 
     `Write a short in-character briefing (max 110 words) in ${language}: react, give 1-2 practical tips tied to the plan, encourage. Plain text only.`,
   ].join('\n\n')
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
