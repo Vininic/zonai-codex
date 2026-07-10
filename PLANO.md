@@ -236,7 +236,10 @@ Adaptadores de IA: **reaproveitar do Mythquill** (Gemini + OpenAI-compatible). S
 - [x] Tracker em tabela (nome | barra | contagem | %), divisórias finas
 - [x] Mapa: ícones reais (zd-icons, ≤250 itens/categoria; koroks/locations em canvas), painel filtro+legenda com pendentes por camada
 - [x] Companion → chat da Purah: intent local + Gemini opcional (frases livres); planos determinísticos em cascata — coleta (rota otimizada) e upgrade de armadura 4★ (materiais/nível × estoque do save, baú no mapa). "A IA não surta": LLM só interpreta e narra
-- [ ] Pendente do review: narração/intent com chave Gemini real (não testado); ícones de materiais individuais nos cards (hoje ícone genérico)
+- [x] IA real (2026-07-10): lib/ai.ts multi-provider (Gemini + OpenAI-compatible tipo OpenRouter/Groq/Ollama), chave via VITE_GEMINI_API_KEY (.env.local) com override no painel; modelos 2.5 aposentados → aliases *-latest; **validado com Gemini de verdade** (intent de frase livre + narração em personagem)
+- [x] Planos em fluxo (2026-07-10): PlanFlow (flow chart vertical); armadura passo a passo (baú → materiais por estrela → farm de chefes mapeados, rota baú+chefes no mapa); regiões (11 boxes, "limpar Hebra" = passos por categoria + rota A→B→C encadeada cap 36 no mapa)
+- [ ] Chave Gemini em PROD: decisão do usuário — `cd app && vercel env add VITE_GEMINI_API_KEY production` (colar a chave) + redeploy. A chave VITE_ é pública no bundle (modelo BYOK); sem ela, prod exige colar chave no painel ⚙
+- [ ] Ícones de materiais individuais nos cards (hoje ícone genérico de folha)
 
 ### F6 — Polish e lançamento
 - [ ] Passe de identidade visual completo, animações, empty states
