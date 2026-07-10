@@ -3,9 +3,13 @@
  * (a IA não pode "surtar": o plano em si é sempre determinístico);
  * Gemini BYOK só refina a interpretação de frases livres.
  */
+import { aiComplete, type AiConfig } from './ai'
+import { REGIONS } from './regions'
+
 export type Intent =
   | { kind: 'armor'; label: string }
   | { kind: 'collect'; categoryId: string }
+  | { kind: 'region'; regionId: string }
   | { kind: 'summary' }
   | { kind: 'unknown' }
 
@@ -71,42 +75,52 @@ export function parseIntentLocal(text: string, armorLabels: string[]): Intent {
   for (const [categoryId, aliases] of Object.entries(CATEGORY_ALIASES))
     for (const alias of aliases) flat.push({ alias: norm(alias), categoryId })
   flat.sort((a, b) => b.alias.length - a.alias.length)
+  let categoryHit: string | null = null
   for (const { alias, categoryId } of flat) {
-    if (q.includes(alias)) return { kind: 'collect', categoryId }
+    if (q.includes(alias)) {
+      categoryHit = categoryId
+      break
+    }
   }
+
+  // região: "limpar Hebra", "clear Gerudo", "100% de Akkala"…
+  let regionHit: string | null = null
+  for (const region of REGIONS) {
+    if (region.aliases.some((a) => q.includes(norm(a)))) {
+      regionHit = region.id
+      break
+    }
+  }
+  const clearish = /(limpar|clear|completar|complete|fechar|finish|100|area|área|regiao|região|region|zona|zone|tudo)/.test(q)
+
+  if (regionHit && (clearish || !categoryHit)) return { kind: 'region', regionId: regionHit }
+  if (categoryHit) return { kind: 'collect', categoryId: categoryHit }
   return { kind: 'unknown' }
 }
 
 /** fallback LLM pra frases livres — devolve o MESMO formato de intent */
 export async function parseIntentLLM(
-  apiKey: string,
+  cfg: AiConfig,
   text: string,
   categoryIds: string[],
   armorLabels: string[],
-  model = 'gemini-2.5-flash',
+  regionIds: string[],
 ): Promise<Intent> {
   const prompt = [
     'Classify a Zelda TOTK completion-helper request into JSON. Reply ONLY minified JSON, no markdown.',
     `Categories: ${categoryIds.join(', ')}`,
+    `Regions: ${regionIds.join(', ')}`,
     `Armor labels: ${armorLabels.join(' | ')}`,
-    'Schema: {"kind":"armor","label":"<exact armor label>"} OR {"kind":"collect","categoryId":"<exact category id>"} OR {"kind":"summary"} OR {"kind":"unknown"}',
+    'Schema: {"kind":"armor","label":"<exact armor label>"} OR {"kind":"collect","categoryId":"<exact category id>"} OR {"kind":"region","regionId":"<exact region id>"} OR {"kind":"summary"} OR {"kind":"unknown"}',
     `Request: ${text}`,
   ].join('\n')
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0 } }),
-    },
-  )
-  if (!res.ok) return { kind: 'unknown' }
-  const json = await res.json()
-  const raw: string = json?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? ''
   try {
+    const raw = await aiComplete(cfg, prompt, { json: true, temperature: 0 })
     const parsed = JSON.parse(raw.replace(/^```(json)?|```$/g, '').trim())
     if (parsed.kind === 'armor' && armorLabels.includes(parsed.label)) return parsed
     if (parsed.kind === 'collect' && categoryIds.includes(parsed.categoryId)) return parsed
+    if (parsed.kind === 'region' && regionIds.includes(parsed.regionId)) return parsed
+    if (parsed.kind === 'summary') return parsed
   } catch {
     /* intent inválida vira unknown */
   }

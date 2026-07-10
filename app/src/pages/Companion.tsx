@@ -4,10 +4,14 @@ import { useTranslation } from 'react-i18next'
 import { useDataset } from '../lib/useDataset'
 import { planRoute, progressBrief } from '../lib/planner'
 import { purahChatText } from '../lib/purah'
+import { activeAiConfig, ENV_GEMINI_KEY } from '../lib/ai'
 import { parseIntentLocal, parseIntentLLM, type Intent } from '../lib/intent'
 import { allArmorLabels, buildArmorPlan, type ArmorPlan } from '../lib/armorPlanner'
+import { buildRegionPlan, type RegionPlan } from '../lib/regionPlanner'
+import { REGIONS, regionById } from '../lib/regions'
 import { categoryMeta } from '../lib/categoryMeta'
 import { computeProgress } from '../lib/useDataset'
+import { PlanFlow, type FlowStepDef } from '../components/PlanFlow'
 import { useAppStore, type RouteStep } from '../store/appStore'
 
 interface CollectPlan {
@@ -25,7 +29,11 @@ interface SummaryPlan {
   type: 'summary'
   rows: { id: string; name: string; done: number; total: number }[]
 }
-type Plan = CollectPlan | ArmorPlanMsg | SummaryPlan
+interface RegionPlanMsg {
+  type: 'region'
+  plan: RegionPlan
+}
+type Plan = CollectPlan | ArmorPlanMsg | SummaryPlan | RegionPlanMsg
 
 interface Msg {
   role: 'user' | 'purah'
@@ -39,10 +47,19 @@ export function Companion() {
   const manual = useAppStore((s) => s.manual)
   const fromSave = useAppStore((s) => s.fromSave)
   const player = useAppStore((s) => s.player)
-  const geminiKey = useAppStore((s) => s.geminiKey)
-  const aiModel = useAppStore((s) => s.aiModel)
   const aiNarration = useAppStore((s) => s.aiNarration)
   const lang = useAppStore((s) => s.lang)
+  const aiProvider = useAppStore((s) => s.aiProvider)
+  const geminiKey = useAppStore((s) => s.geminiKey)
+  const aiModel = useAppStore((s) => s.aiModel)
+  const oaiBaseUrl = useAppStore((s) => s.oaiBaseUrl)
+  const oaiModel = useAppStore((s) => s.oaiModel)
+  const oaiKey = useAppStore((s) => s.oaiKey)
+
+  const cfg = useMemo(
+    () => activeAiConfig({ aiProvider, geminiKey, aiModel, oaiBaseUrl, oaiModel, oaiKey }),
+    [aiProvider, geminiKey, aiModel, oaiBaseUrl, oaiModel, oaiKey],
+  )
 
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState('')
@@ -58,20 +75,37 @@ export function Companion() {
     return (data.categories.find((c) => c.id === id) ?? data.stats.find((s) => s.id === id))?.label ?? id
   }
 
-  // sugestões guiadas dinâmicas (6): coletas incompletas, armadura, resumo
+  // sugestões guiadas dinâmicas: coletas incompletas, armadura, região, resumo
   const suggestions = useMemo(() => {
     const groups = computeProgress(data, manual, fromSave)
     const out: string[] = []
     const incompleteCats = groups
       .filter((g) => g.isMarkerCategory && g.done < g.total)
       .sort((a, b) => a.done / a.total - b.done / b.total)
-    for (const g of incompleteCats.slice(0, 3)) out.push(t('companion.suggestCollect', { name: groupName(g.id) }))
+    for (const g of incompleteCats.slice(0, 2)) out.push(t('companion.suggestCollect', { name: groupName(g.id) }))
     const upg = data.stats.find((s) => s.id === 'armor_upgraded')
     const notMax = upg?.items.find((i) => !(manual['armor_upgraded']?.[i.id] || fromSave['armor_upgraded']?.[i.id]))
     if (notMax) out.push(t('companion.suggestArmor', { name: notMax.label ?? notMax.id }))
+    // região com mais pendências
+    let bestRegion = REGIONS[0]
+    let bestCount = -1
+    for (const region of REGIONS) {
+      let count = 0
+      for (const cat of data.categories) {
+        const m = manual[cat.id] ?? {}
+        const s = fromSave[cat.id] ?? {}
+        for (const item of cat.items) {
+          if (m[item.id] || s[item.id]) continue
+          if (item.x >= region.box.x1 && item.x <= region.box.x2 && item.z >= region.box.z1 && item.z <= region.box.z2) count++
+        }
+      }
+      if (count > bestCount) {
+        bestCount = count
+        bestRegion = region
+      }
+    }
+    out.push(t('companion.suggestRegion', { name: bestRegion.name }))
     out.push(t('companion.suggestSummary'))
-    const bosses = incompleteCats.find((g) => ['gleeok', 'hinox', 'dungeon_bosses', 'frox', 'stone_talus'].includes(g.id))
-    if (bosses && out.length < 6) out.push(t('companion.suggestCollect', { name: groupName(bosses.id) }))
     if (out.length < 6 && armorLabels[0]) out.push(t('companion.suggestArmor', { name: armorLabels[0] }))
     return [...new Set(out)].slice(0, 6)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,9 +152,9 @@ export function Companion() {
     requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }))
 
     let intent: Intent = parseIntentLocal(text, armorLabels)
-    if (intent.kind === 'unknown' && geminiKey) {
+    if (intent.kind === 'unknown' && cfg) {
       try {
-        intent = await parseIntentLLM(geminiKey, text, data.categories.map((c) => c.id), armorLabels, aiModel)
+        intent = await parseIntentLLM(cfg, text, data.categories.map((c) => c.id), armorLabels, REGIONS.map((r) => r.id))
       } catch {
         /* fica unknown */
       }
@@ -148,8 +182,20 @@ export function Companion() {
           ? p.currentStars === 4
             ? t('companion.armorMaxed', { name: p.label })
             : t('companion.armorReply', { name: p.label, stars: p.currentStars ?? '?' })
-          : t('companion.armorNotOwned', { name: p.label })
+          : t('companion.armorFlowReply', { name: p.label })
         narrationContext = `Armor plan for ${p.label}: owned=${p.owned}, stars=${p.currentStars}, totals=${p.totals.map((c) => `${c.qty}x ${c.material}${c.owned !== null ? ` (have ${c.owned})` : ''}`).join('; ')}`
+      }
+    } else if (intent.kind === 'region') {
+      const region = regionById(intent.regionId)
+      if (region) {
+        const pos = player?.position ? { x: player.position.x, z: player.position.z } : null
+        const p = buildRegionPlan(data, manual, fromSave, region, pos)
+        plan = { type: 'region', plan: p }
+        reply =
+          p.totalPending === 0
+            ? t('companion.regionDone', { name: region.name })
+            : t('companion.regionReply', { name: region.name, count: p.totalPending, steps: p.steps.length })
+        narrationContext = `Region sweep of ${region.name}: ${p.totalPending} pending across ${p.steps.length} steps: ${p.steps.map((s) => `${s.categoryId} (${s.pendingTotal})`).join(', ')}`
       }
     } else if (intent.kind === 'summary') {
       const p = buildSummaryPlan()
@@ -164,14 +210,9 @@ export function Companion() {
     setBusy(false)
     requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }))
 
-    if (plan && geminiKey && aiNarration && narrationContext) {
+    if (plan && cfg && aiNarration && narrationContext) {
       try {
-        const narration = await purahChatText(
-          geminiKey,
-          lang,
-          `${narrationContext}\nOverall progress: ${progressBrief(data, manual, fromSave).slice(0, 800)}`,
-          aiModel,
-        )
+        const narration = await purahChatText(cfg, lang, `${narrationContext}\nOverall progress: ${progressBrief(data, manual, fromSave).slice(0, 800)}`)
         setMessages((prev) => [...prev, { role: 'purah', text: narration }])
         requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }))
       } catch {
@@ -194,7 +235,7 @@ export function Companion() {
         ) : (
           <span />
         )}
-        <AiSettings />
+        <AiSettings aiReady={!!cfg} />
       </div>
 
       {/* área central */}
@@ -221,11 +262,12 @@ export function Companion() {
             ) : (
               <div key={i} className="flex items-start gap-2.5">
                 <PurahFace size={30} />
-                <div className="min-w-0 max-w-[90%] space-y-2">
+                <div className="min-w-0 max-w-[90%] flex-1 space-y-2">
                   {m.text && <p className="whitespace-pre-wrap text-sm leading-relaxed">{m.text}</p>}
                   {m.plan?.type === 'collect' && <CollectPlanCard plan={m.plan} groupName={groupName} />}
-                  {m.plan?.type === 'armor' && <ArmorPlanCard plan={m.plan.plan} />}
+                  {m.plan?.type === 'armor' && <ArmorPlanCard plan={m.plan.plan} groupName={groupName} />}
                   {m.plan?.type === 'summary' && <SummaryCard plan={m.plan} />}
+                  {m.plan?.type === 'region' && <RegionPlanCard plan={m.plan.plan} groupName={groupName} />}
                 </div>
               </div>
             ),
@@ -235,7 +277,7 @@ export function Companion() {
         </div>
       )}
 
-      {/* sugestões + input (embaixo, como na referência) */}
+      {/* sugestões + input */}
       <div className="mt-4 space-y-2.5">
         <p className="text-[10px] font-medium uppercase tracking-widest text-ink-faint">{t('companion.suggestionsLabel')}</p>
         <div className={`gap-2 ${empty ? 'grid grid-cols-1 sm:grid-cols-3' : 'flex flex-wrap'}`}>
@@ -281,45 +323,76 @@ export function Companion() {
   )
 }
 
-function AiSettings() {
+function AiSettings({ aiReady }: { aiReady: boolean }) {
   const { t } = useTranslation()
+  const aiProvider = useAppStore((s) => s.aiProvider)
+  const setAiProvider = useAppStore((s) => s.setAiProvider)
   const geminiKey = useAppStore((s) => s.geminiKey)
   const setGeminiKey = useAppStore((s) => s.setGeminiKey)
   const aiModel = useAppStore((s) => s.aiModel)
   const setAiModel = useAppStore((s) => s.setAiModel)
+  const oaiBaseUrl = useAppStore((s) => s.oaiBaseUrl)
+  const setOaiBaseUrl = useAppStore((s) => s.setOaiBaseUrl)
+  const oaiModel = useAppStore((s) => s.oaiModel)
+  const setOaiModel = useAppStore((s) => s.setOaiModel)
+  const oaiKey = useAppStore((s) => s.oaiKey)
+  const setOaiKey = useAppStore((s) => s.setOaiKey)
   const aiNarration = useAppStore((s) => s.aiNarration)
   const setAiNarration = useAppStore((s) => s.setAiNarration)
+
+  const fieldCls = 'panel mt-1 w-full bg-stone-2 px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-faint focus:outline-none'
 
   return (
     <details className="relative">
       <summary className="panel flex cursor-pointer list-none items-center gap-1.5 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wide text-ink-mute hover:text-jade">
         ⚙ {t('companion.byokShort')}
-        <span className="h-1.5 w-1.5 rounded-full" style={{ background: geminiKey ? 'var(--color-jade)' : 'var(--color-ink-faint)' }} />
+        <span className="h-1.5 w-1.5 rounded-full" style={{ background: aiReady ? 'var(--color-jade)' : 'var(--color-gloom)', boxShadow: aiReady ? 'var(--glow-jade)' : undefined }} />
       </summary>
-      <div className="absolute right-0 z-30 mt-2 w-80 space-y-3 border border-edge bg-stone p-4">
+      <div className="absolute right-0 z-30 mt-2 w-85 space-y-3 border border-edge bg-stone p-4">
         <p className="text-[11px] leading-relaxed text-ink-faint">{t('companion.byokHint')}</p>
+
         <label className="block text-[10px] uppercase tracking-widest text-ink-mute">
-          {t('companion.apiKey')}
-          <input
-            type="password"
-            value={geminiKey}
-            onChange={(e) => setGeminiKey(e.target.value)}
-            placeholder="AIza…"
-            className="panel mt-1 w-full bg-stone-2 px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-faint focus:outline-none"
-          />
-        </label>
-        <label className="block text-[10px] uppercase tracking-widest text-ink-mute">
-          {t('companion.model')}
-          <select
-            value={aiModel}
-            onChange={(e) => setAiModel(e.target.value)}
-            className="panel mt-1 w-full bg-stone-2 px-2 py-2 text-sm text-ink"
-          >
-            <option value="gemini-2.5-flash">Gemini 2.5 Flash ({t('companion.modelFast')})</option>
-            <option value="gemini-2.5-pro">Gemini 2.5 Pro ({t('companion.modelSmart')})</option>
-            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite ({t('companion.modelLite')})</option>
+          {t('companion.provider')}
+          <select value={aiProvider} onChange={(e) => setAiProvider(e.target.value as 'gemini' | 'openai')} className="panel mt-1 w-full bg-stone-2 px-2 py-2 text-sm text-ink">
+            <option value="gemini">Google Gemini</option>
+            <option value="openai">OpenAI-compatible (OpenRouter / Groq / Ollama…)</option>
           </select>
         </label>
+
+        {aiProvider === 'gemini' ? (
+          <>
+            <label className="block text-[10px] uppercase tracking-widest text-ink-mute">
+              {t('companion.apiKey')}
+              <input type="password" value={geminiKey} onChange={(e) => setGeminiKey(e.target.value)} placeholder={ENV_GEMINI_KEY ? t('companion.envKeyActive') : 'AIza…'} className={fieldCls} />
+            </label>
+            {ENV_GEMINI_KEY && !geminiKey && <p className="text-[10px]" style={{ color: 'var(--color-jade)' }}>✓ {t('companion.envKeyNote')}</p>}
+            <label className="block text-[10px] uppercase tracking-widest text-ink-mute">
+              {t('companion.model')}
+              <select value={aiModel} onChange={(e) => setAiModel(e.target.value)} className="panel mt-1 w-full bg-stone-2 px-2 py-2 text-sm text-ink">
+                <option value="gemini-flash-latest">Gemini Flash ({t('companion.modelFast')})</option>
+                <option value="gemini-pro-latest">Gemini Pro ({t('companion.modelSmart')})</option>
+                <option value="gemini-flash-lite-latest">Gemini Flash-Lite ({t('companion.modelLite')})</option>
+                <option value="gemini-3-flash-preview">Gemini 3 Flash (preview)</option>
+              </select>
+            </label>
+          </>
+        ) : (
+          <>
+            <label className="block text-[10px] uppercase tracking-widest text-ink-mute">
+              Base URL
+              <input value={oaiBaseUrl} onChange={(e) => setOaiBaseUrl(e.target.value)} placeholder="https://openrouter.ai/api/v1" className={fieldCls} />
+            </label>
+            <label className="block text-[10px] uppercase tracking-widest text-ink-mute">
+              {t('companion.model')}
+              <input value={oaiModel} onChange={(e) => setOaiModel(e.target.value)} placeholder="meta-llama/llama-3.3-70b-instruct:free" className={fieldCls} />
+            </label>
+            <label className="block text-[10px] uppercase tracking-widest text-ink-mute">
+              {t('companion.apiKey')}
+              <input type="password" value={oaiKey} onChange={(e) => setOaiKey(e.target.value)} placeholder="sk-…" className={fieldCls} />
+            </label>
+          </>
+        )}
+
         <label className="flex cursor-pointer items-center gap-2 text-xs text-ink-mute">
           <input type="checkbox" checked={aiNarration} onChange={(e) => setAiNarration(e.target.checked)} className="h-3.5 w-3.5 accent-(--color-jade)" />
           {t('companion.narration')}
@@ -329,7 +402,7 @@ function AiSettings() {
   )
 }
 
-/** rosto da Purah (render oficial recortado); fallback = runa Zonai */
+/** rosto da Purah (retrato do usuário); fallback = runa Zonai */
 function PurahFace({ size }: { size: number }) {
   const [failed, setFailed] = useState(false)
   if (failed) {
@@ -395,6 +468,63 @@ function CollectPlanCard({ plan, groupName }: { plan: CollectPlan; groupName: (i
   )
 }
 
+function RegionPlanCard({ plan, groupName }: { plan: RegionPlan; groupName: (id: string) => string }) {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const setRoute = useAppStore((s) => s.setRoute)
+  if (plan.totalPending === 0) return null
+
+  const steps: FlowStepDef[] = plan.steps.map((s) => {
+    const meta = categoryMeta(s.categoryId)
+    return {
+      color: meta.color,
+      title: (
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          {meta.icon ? <img src={meta.icon} alt="" className="h-4.5 w-4.5 object-contain" /> : <span className="h-2 w-2 rounded-full" style={{ background: meta.color }} />}
+          <span className="min-w-0 truncate">{groupName(s.categoryId)}</span>
+          <span className="ml-auto shrink-0 font-mono text-xs" style={{ color: meta.color }}>
+            {s.pendingTotal}
+          </span>
+        </span>
+      ),
+      children: (
+        <div className="space-y-0.5">
+          {s.items.slice(0, 4).map((it) => (
+            <p key={it.itemId} className="truncate font-mono text-[10px] text-ink-faint">
+              {it.label.startsWith('(') ? it.label : `${it.label} · (${Math.round(it.x)}, ${Math.round(it.z)})${it.layer !== 'surface' ? ` · ${it.layer}` : ''}`}
+            </p>
+          ))}
+          {s.pendingTotal > 4 && <p className="font-mono text-[10px] text-ink-faint">+{s.pendingTotal - 4}…</p>}
+        </div>
+      ),
+    }
+  })
+
+  return (
+    <div className="panel space-y-3 p-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-sm font-medium">{plan.regionName}</span>
+        <span className="font-mono text-xs" style={{ color: 'var(--color-jade)' }}>
+          {plan.totalPending} {t('companion.pending')}
+        </span>
+      </div>
+      <PlanFlow steps={steps} />
+      <div className="flex items-center gap-3 border-t border-edge/60 pt-2">
+        <button
+          onClick={() => {
+            setRoute(plan.route)
+            navigate('/map')
+          }}
+          className="btn-jade !px-3 !py-1.5 !text-xs"
+        >
+          {t('companion.showOnMap')}
+        </button>
+        <span className="font-mono text-[10px] text-ink-faint">{t('companion.routePoints', { count: plan.route.length })}</span>
+      </div>
+    </div>
+  )
+}
+
 function SummaryCard({ plan }: { plan: SummaryPlan }) {
   return (
     <div className="panel space-y-2 p-3">
@@ -419,10 +549,100 @@ function SummaryCard({ plan }: { plan: SummaryPlan }) {
   )
 }
 
-function ArmorPlanCard({ plan }: { plan: ArmorPlan }) {
+function ArmorPlanCard({ plan, groupName }: { plan: ArmorPlan; groupName: (id: string) => string }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const setRoute = useAppStore((s) => s.setRoute)
+  const player = useAppStore((s) => s.player)
+  const data = useDataset()
+
+  // rota de execução: baú (se falta a peça) + chefes que dropam materiais faltantes
+  const armorRoute = useMemo(() => {
+    const route: RouteStep[] = []
+    let cursor = player?.position ? { x: player.position.x, z: player.position.z } : { x: 0, z: 0 }
+    if (!plan.owned && plan.chest) {
+      route.push({ groupId: 'armor', itemId: plan.chest.itemId, label: plan.label, x: plan.chest.x, z: plan.chest.z, layer: plan.chest.layer })
+      cursor = { x: plan.chest.x, z: plan.chest.z }
+    }
+    for (const target of plan.farmTargets) {
+      const cat = data.categories.find((c) => c.id === target.categoryId)
+      if (!cat) continue
+      const pool = cat.items.map((i) => ({
+        groupId: cat.id,
+        itemId: i.id,
+        label: `${groupName(cat.id)} — ${target.materials.join(', ')}`,
+        x: i.x,
+        z: i.z,
+        layer: i.layer ?? 'surface',
+      }))
+      let picked = 0
+      while (picked < 4 && pool.length > 0 && route.length < 16) {
+        let bestIdx = 0
+        let bestDist = Infinity
+        for (let i = 0; i < pool.length; i++) {
+          const d = (pool[i].x - cursor.x) ** 2 + (pool[i].z - cursor.z) ** 2
+          if (d < bestDist) {
+            bestDist = d
+            bestIdx = i
+          }
+        }
+        const next = pool.splice(bestIdx, 1)[0]
+        route.push(next)
+        cursor = next
+        picked++
+      }
+    }
+    return route
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan, player, data])
+
+  const steps: FlowStepDef[] = []
+  if (!plan.owned) {
+    steps.push({
+      color: 'var(--color-gold)',
+      title: <span>{t('companion.stepGetPiece')}</span>,
+      children: plan.chest ? (
+        <p className="text-xs text-ink-mute">{t('companion.chestAt', { x: Math.round(plan.chest.x), z: Math.round(plan.chest.z), layer: plan.chest.layer })}</p>
+      ) : (
+        <p className="text-xs text-ink-faint">{t('companion.noChest')}</p>
+      ),
+    })
+  }
+  for (const lvl of plan.levels) {
+    steps.push({
+      title: (
+        <span>
+          {t('companion.stepUpgrade', { stars: lvl.level })} <span className="text-ink-faint">{'★'.repeat(lvl.level)}{'☆'.repeat(4 - lvl.level)}</span>
+        </span>
+      ),
+      children: (
+        <div className="grid gap-1 sm:grid-cols-2">
+          {lvl.costs.map((c) => (
+            <MaterialRow key={c.material} cost={c} />
+          ))}
+        </div>
+      ),
+    })
+  }
+  if (plan.farmTargets.length > 0) {
+    steps.push({
+      color: 'var(--color-gloom)',
+      title: <span>{t('companion.stepFarm')}</span>,
+      children: (
+        <div className="flex flex-wrap gap-1.5">
+          {plan.farmTargets.map((f) => {
+            const meta = categoryMeta(f.categoryId)
+            return (
+              <span key={f.categoryId} className="flex items-center gap-1.5 border border-edge/60 px-2 py-1 text-[11px] text-ink-mute">
+                {meta.icon && <img src={meta.icon} alt="" className="h-3.5 w-3.5 object-contain" />}
+                {groupName(f.categoryId)}: {f.materials.join(', ')}
+              </span>
+            )
+          })}
+        </div>
+      ),
+    })
+  }
 
   return (
     <div className="panel space-y-3 p-3">
@@ -434,39 +654,10 @@ function ArmorPlanCard({ plan }: { plan: ArmorPlan }) {
         </span>
       </div>
 
-      {!plan.owned && plan.chest && (
-        <div className="flex items-center justify-between gap-2 border border-edge/60 px-2.5 py-2 text-xs">
-          <span className="text-ink-mute">
-            {t('companion.chestAt', { x: Math.round(plan.chest.x), z: Math.round(plan.chest.z), layer: plan.chest.layer })}
-          </span>
-          <button
-            onClick={() => {
-              setRoute([{ groupId: 'armor', itemId: plan.chest!.itemId, label: plan.label, x: plan.chest!.x, z: plan.chest!.z, layer: plan.chest!.layer }])
-              navigate('/map')
-            }}
-            className="shrink-0 border border-edge px-2 py-1 text-[10px] uppercase text-ink-mute hover:text-jade"
-          >
-            {t('companion.showOnMap')}
-          </button>
-        </div>
-      )}
-
       {!plan.upgradable && plan.owned && <p className="text-xs text-ink-faint">{t('companion.notUpgradable')}</p>}
       {plan.currentStars === null && plan.owned && <p className="text-xs text-ink-faint">{t('companion.starsUnknown')}</p>}
 
-      {plan.levels.map((lvl) => (
-        <div key={lvl.level}>
-          <p className="mb-1 text-[10px] uppercase tracking-widest text-ink-faint">
-            {'★'.repeat(lvl.level)}
-            {'☆'.repeat(4 - lvl.level)}
-          </p>
-          <div className="grid gap-1 sm:grid-cols-2">
-            {lvl.costs.map((c) => (
-              <MaterialRow key={c.material} cost={c} />
-            ))}
-          </div>
-        </div>
-      ))}
+      {steps.length > 0 && <PlanFlow steps={steps} />}
 
       {plan.totals.length > 0 && (
         <div className="border-t border-edge/60 pt-2">
@@ -478,7 +669,21 @@ function ArmorPlanCard({ plan }: { plan: ArmorPlan }) {
           </div>
         </div>
       )}
-      {plan.levels.length > 0 && <p className="text-[10px] text-ink-faint">{t('companion.fairyNote')}</p>}
+
+      <div className="flex items-center gap-3 border-t border-edge/60 pt-2">
+        {armorRoute.length > 0 && (
+          <button
+            onClick={() => {
+              setRoute(armorRoute)
+              navigate('/map')
+            }}
+            className="btn-jade !px-3 !py-1.5 !text-xs"
+          >
+            {t('companion.showOnMap')}
+          </button>
+        )}
+        {plan.levels.length > 0 && <p className="text-[10px] text-ink-faint">{t('companion.fairyNote')}</p>}
+      </div>
     </div>
   )
 }

@@ -58,10 +58,16 @@ interface AppState {
   excluded: IdSet
   /** rota planejada pela companion, desenhada no mapa */
   route: RouteStep[] | null
+  /** provider de IA da companion */
+  aiProvider: 'gemini' | 'openai'
   /** chave Gemini (BYOK) da companion */
   geminiKey: string
   /** modelo Gemini usado pela companion */
   aiModel: string
+  /** endpoint OpenAI-compatible (OpenRouter/Groq/Ollama…) */
+  oaiBaseUrl: string
+  oaiModel: string
+  oaiKey: string
   /** Purah narra os planos com a IA (quando há chave) */
   aiNarration: boolean
   /** sidebar desktop recolhida (só ícones) */
@@ -76,6 +82,10 @@ interface AppState {
   setRoute: (route: RouteStep[] | null) => void
   setGeminiKey: (key: string) => void
   setAiModel: (model: string) => void
+  setAiProvider: (p: 'gemini' | 'openai') => void
+  setOaiBaseUrl: (v: string) => void
+  setOaiModel: (v: string) => void
+  setOaiKey: (v: string) => void
   setAiNarration: (on: boolean) => void
   toggleSidebar: () => void
   /** restaura um backup JSON exportado */
@@ -94,8 +104,12 @@ export const useAppStore = create<AppState>()(
       lastDiff: null,
       excluded: {},
       route: null,
+      aiProvider: 'gemini' as const,
       geminiKey: '',
-      aiModel: 'gemini-2.5-flash',
+      aiModel: 'gemini-flash-latest',
+      oaiBaseUrl: 'https://openrouter.ai/api/v1',
+      oaiModel: 'meta-llama/llama-3.3-70b-instruct:free',
+      oaiKey: '',
       aiNarration: true,
       sidebarCollapsed: false,
 
@@ -124,6 +138,10 @@ export const useAppStore = create<AppState>()(
       setRoute: (route) => set({ route }),
       setGeminiKey: (geminiKey) => set({ geminiKey }),
       setAiModel: (aiModel) => set({ aiModel }),
+      setAiProvider: (aiProvider) => set({ aiProvider }),
+      setOaiBaseUrl: (oaiBaseUrl) => set({ oaiBaseUrl }),
+      setOaiModel: (oaiModel) => set({ oaiModel }),
+      setOaiKey: (oaiKey) => set({ oaiKey }),
       setAiNarration: (aiNarration) => set({ aiNarration }),
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       restore: (snapshot) => set(snapshot),

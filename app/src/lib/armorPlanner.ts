@@ -40,7 +40,19 @@ export interface ArmorPlan {
   levels: { level: number; costs: ArmorPlanCost[] }[]
   totals: ArmorPlanCost[]
   chest: { itemId: string; x: number; z: number; layer: string } | null
+  /** chefes mapeados que dropam materiais faltantes (rota de farm) */
+  farmTargets: { categoryId: string; materials: string[] }[]
 }
+
+/** material → categoria de chefe mapeada no dataset (farm roteável) */
+const BOSS_MATERIAL_PATTERNS: [RegExp, string][] = [
+  [/hinox/i, 'hinox'],
+  [/gleeok/i, 'gleeok'],
+  [/frox/i, 'frox'],
+  [/talus/i, 'stone_talus'],
+  [/molduga/i, 'molduga'],
+  [/flux construct/i, 'flux_construct'],
+]
 
 function upgradeBlock(data: CompletionData): UpgradeMaterialsBlock | null {
   const stat = data.stats.find((s) => s.id === 'armor_upgraded') as (Stat & { upgradeMaterials?: UpgradeMaterialsBlock }) | undefined
@@ -146,5 +158,18 @@ export function buildArmorPlan(
   const chestItem = chestCat?.items.find((i) => (i as { armorId?: string }).armorId && ids.has((i as { armorId?: string }).armorId!))
   if (chestItem) chest = { itemId: chestItem.id, x: chestItem.x, z: chestItem.z, layer: chestItem.layer ?? 'surface' }
 
-  return { label: armorLabel, owned, currentStars, upgradable: !!entry, levels, totals, chest }
+  // materiais de chefe que ainda faltam → alvos de farm roteáveis no mapa
+  const farmByCat = new Map<string, Set<string>>()
+  for (const c of totals) {
+    if (c.owned !== null && c.owned >= c.qty) continue
+    for (const [pattern, categoryId] of BOSS_MATERIAL_PATTERNS) {
+      if (pattern.test(c.material)) {
+        if (!farmByCat.has(categoryId)) farmByCat.set(categoryId, new Set())
+        farmByCat.get(categoryId)!.add(c.material)
+      }
+    }
+  }
+  const farmTargets = [...farmByCat.entries()].map(([categoryId, mats]) => ({ categoryId, materials: [...mats] }))
+
+  return { label: armorLabel, owned, currentStars, upgradable: !!entry, levels, totals, chest, farmTargets }
 }
