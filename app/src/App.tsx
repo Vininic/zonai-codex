@@ -6,6 +6,7 @@ import { Shell } from './components/Shell'
 import { Dashboard } from './pages/Dashboard'
 import { Tracker } from './pages/Tracker'
 import { Category } from './pages/Category'
+import { Inventory } from './pages/Inventory'
 import { Companion } from './pages/Companion'
 import { MapPage } from './pages/MapPage'
 import { SavePage } from './pages/SavePage'
@@ -41,6 +42,7 @@ export default function App() {
             <Route index element={<Dashboard />} />
             <Route path="tracker" element={<Tracker />} />
             <Route path="tracker/:groupId" element={<Category />} />
+            <Route path="inventory" element={<Inventory />} />
             <Route path="map" element={<MapPage />} />
             <Route path="companion" element={<Companion />} />
             <Route path="save" element={<SavePage />} />

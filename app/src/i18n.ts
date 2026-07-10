@@ -8,7 +8,7 @@ import { initReactI18next } from 'react-i18next'
 const resources = {
   en: {
     translation: {
-      nav: { dashboard: 'Home', tracker: 'Tracker', map: 'Map', companion: 'Companion', save: 'Save' },
+      nav: { dashboard: 'Home', tracker: 'Tracker', inventory: 'Inventory', map: 'Map', companion: 'Companion', save: 'Save' },
       dashboard: {
         title: 'Completion',
         overall: 'True 100%',
@@ -24,6 +24,14 @@ const resources = {
         questsDone: 'Done',
       },
       tracker: { title: 'Tracker', searchPlaceholder: 'Search items…', done: 'Done', pending: 'Pending', all: 'All', empty: 'No items match.', progress: 'Progress', count: 'Count' },
+      inventory: {
+        title: 'Inventory',
+        materials: 'Materials',
+        keyItems: 'Key Items',
+        armor: 'Armor',
+        owned: 'owned',
+        noSession: 'Quantities and armor stars need the save file in memory — import your progress.sav on the Save page to see exact numbers.',
+      },
       map: {
         title: 'Map',
         hideDone: 'Hide done',
@@ -118,7 +126,7 @@ const resources = {
   },
   pt: {
     translation: {
-      nav: { dashboard: 'Início', tracker: 'Tracker', map: 'Mapa', companion: 'Companion', save: 'Save' },
+      nav: { dashboard: 'Início', tracker: 'Tracker', inventory: 'Inventário', map: 'Mapa', companion: 'Companion', save: 'Save' },
       dashboard: {
         title: 'Progresso',
         overall: '100% Real',
@@ -134,6 +142,14 @@ const resources = {
         questsDone: 'Feito',
       },
       tracker: { title: 'Tracker', searchPlaceholder: 'Buscar itens…', done: 'Feitos', pending: 'Pendentes', all: 'Todos', empty: 'Nenhum item encontrado.', progress: 'Progresso', count: 'Contagem' },
+      inventory: {
+        title: 'Inventário',
+        materials: 'Materiais',
+        keyItems: 'Itens-Chave',
+        armor: 'Armaduras',
+        owned: 'possuído',
+        noSession: 'Quantidades e estrelas de armadura exigem o arquivo do save em memória — importe seu progress.sav na página Save pra ver os números exatos.',
+      },
       map: {
         title: 'Mapa',
         hideDone: 'Esconder feitos',

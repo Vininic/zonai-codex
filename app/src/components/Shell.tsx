@@ -6,6 +6,7 @@ import { useAppStore } from '../store/appStore'
 const NAV = [
   { to: '/', key: 'dashboard', icon: RingIcon },
   { to: '/tracker', key: 'tracker', icon: ListIcon },
+  { to: '/inventory', key: 'inventory', icon: PouchIcon },
   { to: '/map', key: 'map', icon: MapIcon },
   { to: '/companion', key: 'companion', icon: EyeIcon },
   { to: '/save', key: 'save', icon: SaveIcon },
@@ -162,6 +163,14 @@ function ListIcon({ active }: IconProps) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" {...stroke(active)}>
       <path d="M4 6h2M4 12h2M4 18h2M10 6h10M10 12h10M10 18h10" strokeLinecap="round" />
+    </svg>
+  )
+}
+function PouchIcon({ active }: IconProps) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" {...stroke(active)}>
+      <path d="M7 9V7a5 5 0 0 1 10 0v2" />
+      <path d="M5.5 9h13l1 11.5a1.5 1.5 0 0 1-1.5 1.5h-12A1.5 1.5 0 0 1 4.5 20.5Z" />
     </svg>
   )
 }
