@@ -1,15 +1,20 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { HashRouter, Route, Routes } from 'react-router-dom'
 import { loadDataset, type CompletionData } from './lib/dataset'
 import { DatasetContext } from './lib/useDataset'
 import { Shell } from './components/Shell'
+import { LoadingRing } from './components/LoadingRing'
 import { Dashboard } from './pages/Dashboard'
 import { Tracker } from './pages/Tracker'
 import { Category } from './pages/Category'
 import { Inventory } from './pages/Inventory'
-import { Companion } from './pages/Companion'
-import { MapPage } from './pages/MapPage'
 import { SavePage } from './pages/SavePage'
+import { NotFound } from './pages/NotFound'
+
+// Leaflet (mapa) e a lógica de IA da Companion são os maiores contribuintes
+// do bundle — lazy-load pra manter o carregamento inicial leve no mobile.
+const MapPage = lazy(() => import('./pages/MapPage').then((m) => ({ default: m.MapPage })))
+const Companion = lazy(() => import('./pages/Companion').then((m) => ({ default: m.Companion })))
 
 export default function App() {
   const [data, setData] = useState<CompletionData | null>(null)
@@ -23,15 +28,7 @@ export default function App() {
     return <div className="flex min-h-dvh items-center justify-center p-6 text-sm" style={{ color: 'var(--color-gloom)' }}>{error}</div>
   }
   if (!data) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center">
-        <svg width="56" height="56" viewBox="0 0 100 100" fill="none" stroke="var(--color-jade)" strokeWidth="2" aria-label="Loading">
-          <circle cx="50" cy="50" r="40" strokeDasharray="60 191" strokeLinecap="round">
-            <animateTransform attributeName="transform" type="rotate" from="0 50 50" to="360 50 50" dur="1.2s" repeatCount="indefinite" />
-          </circle>
-        </svg>
-      </div>
-    )
+    return <LoadingRing />
   }
 
   return (
@@ -43,9 +40,24 @@ export default function App() {
             <Route path="tracker" element={<Tracker />} />
             <Route path="tracker/:groupId" element={<Category />} />
             <Route path="inventory" element={<Inventory />} />
-            <Route path="map" element={<MapPage />} />
-            <Route path="companion" element={<Companion />} />
+            <Route
+              path="map"
+              element={
+                <Suspense fallback={<LoadingRing className="flex min-h-[50vh] items-center justify-center" />}>
+                  <MapPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="companion"
+              element={
+                <Suspense fallback={<LoadingRing className="flex min-h-[50vh] items-center justify-center" />}>
+                  <Companion />
+                </Suspense>
+              }
+            />
             <Route path="save" element={<SavePage />} />
+            <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
       </HashRouter>

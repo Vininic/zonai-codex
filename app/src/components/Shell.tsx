@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useEffect } from 'react'
 import { useAppStore } from '../store/appStore'
@@ -14,6 +14,7 @@ const NAV = [
 
 export function Shell() {
   const { t, i18n } = useTranslation()
+  const location = useLocation()
   const lang = useAppStore((s) => s.lang)
   const theme = useAppStore((s) => s.theme)
   const setLang = useAppStore((s) => s.setLang)
@@ -108,7 +109,9 @@ export function Shell() {
         </header>
 
         <main className="mx-auto w-full max-w-screen-2xl flex-1 px-4 pb-24 pt-2 lg:px-8 lg:pb-10 lg:pt-8">
-          <Outlet />
+          <div key={location.pathname} className="page-enter">
+            <Outlet />
+          </div>
         </main>
       </div>
 

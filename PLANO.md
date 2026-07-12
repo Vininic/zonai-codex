@@ -244,10 +244,10 @@ Adaptadores de IA: **reaproveitar do Mythquill** (Gemini + OpenAI-compatible). S
 - [ ] Ícones de materiais individuais nos cards (hoje ícone genérico de folha)
 
 ### F6 — Polish e lançamento
-- [ ] Passe de identidade visual completo, animações, empty states
-- [ ] Guia de extração de save, créditos/disclaimers, README bilíngue
-- [ ] Performance mobile (1.000 koroks no mapa), Lighthouse PWA
-- [ ] Divulgação (r/TOTK, r/zelda — feedback da comunidade)
+- [x] Passe de identidade visual amplo (2026-07-12): transição de fade entre rotas (`Shell.tsx`, CSS `.page-enter`, opacity-only pra não quebrar o `position:fixed` do MapPage), página 404 temática (`NotFound.tsx` + rota catch-all), animação de revelação em todo `<details>` do app (Dashboard "Meu 100%", Companion ⚙, DiffView), fade-in no painel flutuante do mapa, spinner de carregamento nos botões de import do Save, toast inline de confirmação em Export/Import JSON. Validado no browser (dev tools via JS, screenshot indisponível nesta máquina — GPU quebrada, ver nota antiga).
+- [x] Guia de extração de save, créditos/disclaimers, README bilíngue (2026-07-12): `docs/SAVE_GUIDE.md` (EN+PT, JKSV/Checkpoint via homebrew, sem instruções de jailbreak) + `README.md` reescrito bilíngue (EN primeiro, PT-BR depois) com créditos e disclaimer de não-afiliação.
+- [x] Performance mobile + Lighthouse PWA (2026-07-12): code-splitting por rota (`React.lazy` em MapPage/Companion — bundle inicial 538KB → 284KB gzip 87KB, Leaflet isolado em chunk próprio de 156KB só carregado em `/map`); ícones PWA PNG 192/512 + maskable gerados (só existia SVG antes) e registrados no manifest (`vite.config.ts`); build confirma `manifest.webmanifest` + `sw.js` + precache OK. Mapa com ~2.000 markers canvas simultâneos (koroks+tudo) testado sem travar (dev mode, viewport mobile).
+- [ ] Divulgação (r/TOTK, r/zelda — feedback da comunidade): fora do escopo de agente de código — postar em comunidades é ação manual do usuário.
 
 ### Extensões futuras (fora de escopo agora)
 - Central multi-jogos "Hyrule Codex" (BOTW primeiro — mesma engine de save/mapa muda pouco)

@@ -121,6 +121,42 @@ body::before {
   100% { box-shadow: 0 0 0 14px rgba(87, 230, 192, 0); }
 }
 
+/* fade de entrada por rota (Shell) */
+.page-enter {
+  animation: page-enter 220ms ease both;
+}
+@keyframes page-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* revelação suave de <details> ao abrir (Dashboard, Companion, DiffView) */
+details[open] > *:not(summary) {
+  animation: details-show 200ms ease-out both;
+}
+@keyframes details-show {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* painel flutuante do mapa (legenda/filtro) */
+.panel-in {
+  animation: panel-in 180ms ease-out both;
+}
+@keyframes panel-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* toast/confirmação inline (Save) */
+.toast-in {
+  animation: toast-in 200ms ease-out both;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

@@ -234,7 +234,7 @@ export function MapPage() {
 
       {/* painel filtro+legenda */}
       {panelOpen && (
-        <div className="absolute bottom-32 left-3 top-14 z-[1000] w-64 overflow-y-auto border border-edge bg-stone/95 p-3 backdrop-blur-sm lg:bottom-14">
+        <div className="panel-in absolute bottom-32 left-3 top-14 z-[1000] w-64 overflow-y-auto border border-edge bg-stone/95 p-3 backdrop-blur-sm lg:bottom-14">
           <div className="mb-2 flex gap-1.5">
             <button
               onClick={() => setVisible(new Set(data.categories.map((c) => c.id)))}

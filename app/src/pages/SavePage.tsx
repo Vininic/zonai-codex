@@ -23,8 +23,16 @@ export function SavePage() {
   const lastDiff = useAppStore((s) => s.lastDiff)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const jsonRef = useRef<HTMLInputElement>(null)
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function flashToast(msg: string) {
+    setToast(msg)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(null), 2200)
+  }
 
   async function importBuffer(buffer: ArrayBuffer, fileName: string) {
     setError(null)
@@ -73,6 +81,7 @@ export function SavePage() {
   function exportProgressJson() {
     const snapshot = { manual, fromSave, player, saveMeta, excluded, exportedAt: new Date().toISOString() }
     download(new Blob([JSON.stringify(snapshot)], { type: 'application/json' }), 'zonai-codex-progress.json')
+    flashToast(t('save.toastJsonExported'))
   }
 
   async function importProgressJson(files: FileList | null) {
@@ -82,6 +91,7 @@ export function SavePage() {
       const snap = JSON.parse(await file.text())
       restore({ manual: snap.manual ?? {}, fromSave: snap.fromSave ?? {}, player: snap.player ?? null, saveMeta: snap.saveMeta ?? null, excluded: snap.excluded ?? {} })
       setError(null)
+      flashToast(t('save.toastJsonImported'))
     } catch {
       setError(t('save.invalidJson'))
     }
@@ -117,10 +127,12 @@ export function SavePage() {
             <p className="text-sm text-ink-mute">{t('save.importHint')}</p>
             <input ref={fileRef} type="file" accept=".sav" className="hidden" onChange={(e) => onFile(e.target.files)} />
             <div className="flex flex-col gap-2">
-              <button onClick={() => fileRef.current?.click()} disabled={busy} className="btn-jade">
+              <button onClick={() => fileRef.current?.click()} disabled={busy} className="btn-jade flex items-center justify-center gap-2 disabled:opacity-60">
+                {busy && <Spinner />}
                 {t('save.chooseFile')}
               </button>
-              <button onClick={loadDemo} disabled={busy} className="panel px-4 py-2.5 text-sm text-ink-mute transition-colors hover:text-jade">
+              <button onClick={loadDemo} disabled={busy} className="panel flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-ink-mute transition-colors hover:text-jade disabled:opacity-60">
+                {busy && <Spinner />}
                 {t('save.loadDemo')}
               </button>
             </div>
@@ -131,13 +143,18 @@ export function SavePage() {
             <h3 className="font-display text-sm uppercase tracking-widest text-ink-mute">{t('save.backupTitle')}</h3>
             <p className="text-xs text-ink-faint">{t('save.backupHint')}</p>
             <input ref={jsonRef} type="file" accept=".json" className="hidden" onChange={(e) => importProgressJson(e.target.files)} />
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button onClick={exportProgressJson} className="panel px-3 py-2 text-xs text-ink-mute hover:text-jade">
                 {t('save.exportJson')}
               </button>
               <button onClick={() => jsonRef.current?.click()} className="panel px-3 py-2 text-xs text-ink-mute hover:text-jade">
                 {t('save.importJson')}
               </button>
+              {toast && (
+                <span key={toast} className="toast-in font-mono text-[11px]" style={{ color: 'var(--color-jade)' }}>
+                  ✓ {toast}
+                </span>
+              )}
             </div>
           </section>
         </div>
@@ -299,6 +316,16 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
         </>
       )}
     </section>
+  )
+}
+
+function Spinner() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden className="shrink-0">
+      <circle cx="12" cy="12" r="9" strokeDasharray="14 42" strokeLinecap="round">
+        <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.7s" repeatCount="indefinite" />
+      </circle>
+    </svg>
   )
 }
 
