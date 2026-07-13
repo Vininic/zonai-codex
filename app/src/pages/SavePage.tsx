@@ -196,11 +196,14 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
   const manual = useAppStore((s) => s.manual)
   const fromSave = useAppStore((s) => s.fromSave)
   const player = useAppStore((s) => s.player)
+  const materialQty = useAppStore((s) => s.materialQty)
 
   const session = getSessionSave()
+  const parsedSession = useMemo(() => (session ? parseSave(session.buffer) : null), [session])
   const staged = useMemo(() => computeStaged(data, manual, fromSave), [data, manual, fromSave])
   const writable = staged.filter((s) => s.writable)
   const unsupported = staged.filter((s) => !s.writable)
+  const materialQtyEdits = useMemo(() => Object.entries(materialQty).map(([itemId, qty]) => ({ itemId, qty })), [materialQty])
 
   const [selected, setSelected] = useState<Set<string>>(() => new Set(writable.map((s) => s.groupId)))
   const [edits, setEdits] = useState<PlayerEdits>({})
@@ -212,10 +215,13 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
   }
 
   const plan = useMemo(
-    () => buildEditPlan(data, staged, selected, edits, player),
-    [data, staged, selected, edits, player],
+    () => buildEditPlan(data, staged, selected, edits, player, session?.buffer ?? null, parsedSession?.values ?? null, materialQtyEdits),
+    [data, staged, selected, edits, player, session, parsedSession, materialQtyEdits],
   )
-  const itemOnlyPlan = useMemo(() => buildEditPlan(data, staged, selected, {}, null), [data, staged, selected])
+  const itemOnlyPlan = useMemo(
+    () => buildEditPlan(data, staged, selected, {}, null, session?.buffer ?? null, parsedSession?.values ?? null, materialQtyEdits),
+    [data, staged, selected, session, parsedSession, materialQtyEdits],
+  )
   const playerChanges = plan.writes.size - itemOnlyPlan.writes.size
 
   function toggleGroup(id: string) {
@@ -294,7 +300,15 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
               ))}
             </div>
           )}
-          {writable.length === 0 && <p className="text-xs text-ink-faint">{t('save.noStaged')}</p>}
+          {materialQtyEdits.length > 0 && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="min-w-0 flex-1 truncate text-ink-mute">{t('save.materialQtyStaged')}</span>
+              <span className="font-mono text-xs" style={{ color: 'var(--color-jade)' }}>
+                {materialQtyEdits.length}
+              </span>
+            </div>
+          )}
+          {writable.length === 0 && materialQtyEdits.length === 0 && <p className="text-xs text-ink-faint">{t('save.noStaged')}</p>}
 
           {unsupported.length > 0 && (
             <p className="text-[11px] text-ink-faint">

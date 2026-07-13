@@ -72,6 +72,8 @@ interface AppState {
   aiNarration: boolean
   /** sidebar desktop recolhida (só ícones) */
   sidebarCollapsed: boolean
+  /** quantidade desejada de material (id -> qtd), staged pro editor de save */
+  materialQty: Record<string, number>
 
   setLang: (lang: 'en' | 'pt') => void
   setTheme: (theme: 'dark' | 'light') => void
@@ -88,6 +90,8 @@ interface AppState {
   setOaiKey: (v: string) => void
   setAiNarration: (on: boolean) => void
   toggleSidebar: () => void
+  setMaterialQty: (itemId: string, qty: number) => void
+  clearMaterialQty: (itemId: string) => void
   /** restaura um backup JSON exportado */
   restore: (snapshot: Partial<Pick<AppState, 'manual' | 'fromSave' | 'player' | 'saveMeta' | 'excluded'>>) => void
 }
@@ -112,6 +116,7 @@ export const useAppStore = create<AppState>()(
       oaiKey: '',
       aiNarration: true,
       sidebarCollapsed: false,
+      materialQty: {},
 
       setLang: (lang) => set({ lang }),
       setTheme: (theme) => set({ theme }),
@@ -144,6 +149,13 @@ export const useAppStore = create<AppState>()(
       setOaiKey: (oaiKey) => set({ oaiKey }),
       setAiNarration: (aiNarration) => set({ aiNarration }),
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+      setMaterialQty: (itemId, qty) => set((s) => ({ materialQty: { ...s.materialQty, [itemId]: qty } })),
+      clearMaterialQty: (itemId) =>
+        set((s) => {
+          const materialQty = { ...s.materialQty }
+          delete materialQty[itemId]
+          return { materialQty }
+        }),
       restore: (snapshot) => set(snapshot),
     }),
     { name: 'zonai-codex' },

@@ -14,9 +14,13 @@ export interface MaterialEntry {
   id: string
   label: string
   bucket: MaterialBucket
-  /** null = sem save na sessão (quantidade desconhecida) */
+  /** null = sem save na sessão (quantidade desconhecida); senão qtd efetiva (override se houver) */
   qty: number | null
+  /** qtd real lida do save, antes de qualquer override do usuário */
+  rawQty: number | null
   owned: boolean
+  /** tem override de quantidade pendente (ainda não gravado no save) */
+  staged: boolean
 }
 
 /** fabrics / fabrics_amiibo: kind 'positive', graváveis pelo editor v1 — a
@@ -28,12 +32,16 @@ export interface ToggleableEntry {
   owned: boolean
   /** marcado manualmente mas ainda não gravado no save */
   staged: boolean
+  /** confirmado pelo save — não pode ser des/marcado (fonte de verdade é o arquivo) */
+  locked: boolean
 }
 
 export interface KeyItemEntry {
   id: string
   label: string
   owned: boolean
+  staged: boolean
+  locked: boolean
 }
 
 export interface ArmorEntry {
@@ -42,6 +50,8 @@ export interface ArmorEntry {
   owned: boolean
   /** null = sem save na sessão (nível desconhecido) */
   stars: number | null
+  staged: boolean
+  locked: boolean
 }
 
 function materialStockByActor(data: CompletionData): Map<string, number> | null {
@@ -69,19 +79,31 @@ function materialStockByActor(data: CompletionData): Map<string, number> | null 
   return byActor
 }
 
-export function buildMaterials(data: CompletionData, manual: Progress, fromSave: Progress): MaterialEntry[] {
+export function buildMaterials(
+  data: CompletionData,
+  manual: Progress,
+  fromSave: Progress,
+  materialQty: Record<string, number> = {},
+): MaterialEntry[] {
   const stat = data.stats.find((s) => s.id === 'materials')
   if (!stat) return []
   const stock = materialStockByActor(data)
   const m = manual.materials ?? {}
   const s = fromSave.materials ?? {}
-  return stat.items.map((item) => ({
-    id: item.id,
-    label: item.label ?? item.id,
-    bucket: classifyMaterial(item.actorName, item.label ?? item.id),
-    qty: stock ? (stock.get(item.actorName ?? '') ?? 0) : null,
-    owned: !!(m[item.id] || s[item.id]),
-  }))
+  return stat.items.map((item) => {
+    const rawQty = stock ? (stock.get(item.actorName ?? '') ?? 0) : null
+    const override = materialQty[item.id]
+    const staged = override !== undefined && override !== (rawQty ?? -1)
+    return {
+      id: item.id,
+      label: item.label ?? item.id,
+      bucket: classifyMaterial(item.actorName, item.label ?? item.id),
+      qty: override ?? rawQty,
+      rawQty,
+      owned: !!(m[item.id] || s[item.id]),
+      staged,
+    }
+  })
 }
 
 /** fabrics ou fabrics_amiibo: ambos kind 'positive', graváveis. */
@@ -96,6 +118,7 @@ export function buildToggleable(data: CompletionData, manual: Progress, fromSave
     label: item.label ?? item.id,
     owned: !!(m[item.id] || s[item.id]),
     staged: !!m[item.id] && !s[item.id],
+    locked: !!s[item.id],
   }))
 }
 
@@ -108,6 +131,8 @@ export function buildKeyItems(data: CompletionData, manual: Progress, fromSave: 
     id: item.id,
     label: item.label ?? item.id,
     owned: !!(m[item.id] || s[item.id]),
+    staged: !!m[item.id] && !s[item.id],
+    locked: !!s[item.id],
   }))
 }
 
@@ -122,6 +147,8 @@ export function buildArmor(data: CompletionData, manual: Progress, fromSave: Pro
       label: item.label ?? item.id,
       owned: !!(m[item.id] || s[item.id]),
       stars: null,
+      staged: !!m[item.id] && !s[item.id],
+      locked: !!s[item.id],
     }))
 
   const session = getSessionSave()
@@ -131,9 +158,17 @@ export function buildArmor(data: CompletionData, manual: Progress, fromSave: Pro
   const pouch = new Set(readString64Array(save.buffer, ptr))
 
   return (stat.items as (StatItem & { levels?: { id: string; stars: number }[] })[]).map((item) => {
-    const owned = (item.ids ?? []).some((id) => pouch.has(id))
+    const ownedInSave = (item.ids ?? []).some((id) => pouch.has(id))
     let stars = 0
     for (const lvl of item.levels ?? []) if (pouch.has(lvl.id)) stars = Math.max(stars, lvl.stars)
-    return { id: item.id, label: item.label ?? item.id, owned, stars: owned ? stars : null }
+    const owned = ownedInSave || !!m[item.id]
+    return {
+      id: item.id,
+      label: item.label ?? item.id,
+      owned,
+      stars: ownedInSave ? stars : null,
+      staged: !!m[item.id] && !ownedInSave,
+      locked: ownedInSave,
+    }
   })
 }

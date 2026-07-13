@@ -23,11 +23,14 @@ export function Inventory() {
   const manual = useAppStore((s) => s.manual)
   const fromSave = useAppStore((s) => s.fromSave)
   const toggleManual = useAppStore((s) => s.toggleManual)
+  const materialQty = useAppStore((s) => s.materialQty)
+  const setMaterialQty = useAppStore((s) => s.setMaterialQty)
+  const clearMaterialQty = useAppStore((s) => s.clearMaterialQty)
   const [tab, setTab] = useState<Tab>('materials')
   const [query, setQuery] = useState('')
   const hasSession = !!getSessionSave()
 
-  const materials = useMemo(() => buildMaterials(data, manual, fromSave), [data, manual, fromSave])
+  const materials = useMemo(() => buildMaterials(data, manual, fromSave, materialQty), [data, manual, fromSave, materialQty])
   const keyItems = useMemo(() => buildKeyItems(data, manual, fromSave), [data, manual, fromSave])
   const armor = useMemo(() => buildArmor(data, manual, fromSave), [data, manual, fromSave])
   const fabrics = useMemo(() => buildToggleable(data, manual, fromSave, 'fabrics'), [data, manual, fromSave])
@@ -58,7 +61,13 @@ export function Inventory() {
     fabrics_amiibo: `${amiibo.filter((f) => f.owned).length}/${amiibo.length}`,
   }
 
-  const anyStaged = fabrics.some((f) => f.staged) || amiibo.some((f) => f.staged)
+  const tabStaged: Record<Tab, boolean> = {
+    materials: materials.some((m) => m.staged),
+    key_items: keyItems.some((k) => k.staged),
+    armor: armor.some((a) => a.staged),
+    fabrics: fabrics.some((f) => f.staged),
+    fabrics_amiibo: amiibo.some((f) => f.staged),
+  }
 
   const TABS: Tab[] = ['materials', 'key_items', 'armor', 'fabrics', 'fabrics_amiibo']
   const tabLabel = (tb: Tab): string => {
@@ -102,27 +111,27 @@ export function Inventory() {
         className="panel mb-3 w-full bg-stone px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none"
       />
 
-      {(tab === 'fabrics' || tab === 'fabrics_amiibo') && (
-        <p className="mb-3 text-xs text-ink-faint">
-          {anyStaged ? t('inventory.editHintStaged') : t('inventory.editHint')}{' '}
-          {anyStaged && (
-            <Link to="/save" className="underline decoration-edge-lit underline-offset-2 hover:text-jade">
-              {t('inventory.goToSave')}
-            </Link>
-          )}
-        </p>
-      )}
+      <p className="mb-3 text-xs text-ink-faint">
+        {tabStaged[tab] ? t('inventory.editHintStaged') : tab === 'materials' ? t('inventory.editHintQty') : t('inventory.editHint')}{' '}
+        {tabStaged[tab] && (
+          <Link to="/save" className="underline decoration-edge-lit underline-offset-2 hover:text-jade">
+            {t('inventory.goToSave')}
+          </Link>
+        )}
+      </p>
 
-      {tab === 'materials' && <MaterialGrid items={filteredMaterials} />}
-      {tab === 'key_items' && <KeyItemGrid items={filteredKeyItems} />}
-      {tab === 'armor' && <ArmorGrid items={filteredArmor} />}
+      {tab === 'materials' && (
+        <MaterialGrid items={filteredMaterials} hasSession={hasSession} onChange={setMaterialQty} onClear={clearMaterialQty} />
+      )}
+      {tab === 'key_items' && <KeyItemGrid items={filteredKeyItems} onToggle={(id) => toggleManual('key_items', id)} />}
+      {tab === 'armor' && <ArmorGrid items={filteredArmor} onToggle={(id) => toggleManual('armor_inventory', id)} />}
       {tab === 'fabrics' && <ToggleGrid items={filteredFabrics} onToggle={toggleManual} />}
       {tab === 'fabrics_amiibo' && <ToggleGrid items={filteredAmiibo} onToggle={toggleManual} />}
     </div>
   )
 }
 
-function GridShell({ children, empty }: { children: React.ReactNode; empty: boolean }) {
+function GridShell({ children, empty }: { children?: React.ReactNode; empty: boolean }) {
   const { t } = useTranslation()
   if (empty) return <p className="py-8 text-center text-sm text-ink-mute">{t('tracker.empty')}</p>
   return <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">{children}</div>
@@ -171,20 +180,80 @@ function Badge({ children, color }: { children: React.ReactNode; color: string }
   )
 }
 
-function MaterialGrid({ items }: { items: MaterialEntry[] }) {
+function MaterialGrid({
+  items,
+  hasSession,
+  onChange,
+  onClear,
+}: {
+  items: MaterialEntry[]
+  hasSession: boolean
+  onChange: (id: string, qty: number) => void
+  onClear: (id: string) => void
+}) {
+  if (items.length === 0) return <GridShell empty />
+  return (
+    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+      {items.map((m) => (
+        <div
+          key={m.id}
+          className="panel relative flex aspect-square flex-col items-center justify-center gap-1 p-2 text-center"
+          style={{
+            opacity: m.owned || m.staged ? 1 : 0.55,
+            borderColor: m.staged ? 'var(--color-jade)' : undefined,
+            boxShadow: m.staged ? 'var(--glow-jade)' : undefined,
+          }}
+        >
+          {m.staged && (
+            <button
+              onClick={() => onClear(m.id)}
+              className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-full font-mono text-[10px] text-ink-faint hover:text-gloom"
+              title="reset"
+              aria-label="reset"
+            >
+              ×
+            </button>
+          )}
+          <span style={{ color: m.owned ? 'var(--color-ink)' : 'var(--color-ink-faint)' }}>
+            <TypeIcon kind={m.bucket} size={24} />
+          </span>
+          <span className="line-clamp-2 min-w-0 text-[10px] leading-tight text-ink-mute">{m.label}</span>
+          {hasSession ? (
+            <input
+              type="number"
+              min={0}
+              max={999}
+              value={m.qty ?? 0}
+              onChange={(e) => onChange(m.id, Number(e.target.value))}
+              className="w-11 bg-transparent text-center font-mono text-[11px]"
+              style={{ color: m.staged ? 'var(--color-jade)' : m.qty && m.qty > 0 ? 'var(--color-ink)' : 'var(--color-ink-faint)' }}
+            />
+          ) : (
+            <span className="font-mono text-[10px] text-ink-faint">{m.owned ? '✓' : '—'}</span>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function KeyItemGrid({ items, onToggle }: { items: KeyItemEntry[]; onToggle: (id: string) => void }) {
+  const { t } = useTranslation()
   return (
     <GridShell empty={items.length === 0}>
-      {items.map((m) => (
+      {items.map((k) => (
         <Card
-          key={m.id}
-          icon={m.bucket}
-          label={m.label}
-          dim={!m.owned}
+          key={k.id}
+          icon="key"
+          label={k.label}
+          dim={!k.owned}
+          ring={k.staged ? 'jade' : k.locked ? 'gold' : 'none'}
+          onClick={k.locked ? undefined : () => onToggle(k.id)}
           badge={
-            m.qty !== null ? (
-              <Badge color={m.qty > 0 ? 'var(--color-jade)' : 'var(--color-ink-faint)'}>×{m.qty}</Badge>
-            ) : m.owned ? (
-              <Badge color="var(--color-jade)">✓</Badge>
+            k.staged ? (
+              <Badge color="var(--color-jade)">{t('inventory.staged')}</Badge>
+            ) : k.locked ? (
+              <Badge color="var(--color-gold)">{t('save.detected')}</Badge>
             ) : undefined
           }
         />
@@ -193,17 +262,7 @@ function MaterialGrid({ items }: { items: MaterialEntry[] }) {
   )
 }
 
-function KeyItemGrid({ items }: { items: KeyItemEntry[] }) {
-  return (
-    <GridShell empty={items.length === 0}>
-      {items.map((k) => (
-        <Card key={k.id} icon="key" label={k.label} dim={!k.owned} badge={k.owned ? <Badge color="var(--color-jade)">✓</Badge> : undefined} />
-      ))}
-    </GridShell>
-  )
-}
-
-function ArmorGrid({ items }: { items: ArmorEntry[] }) {
+function ArmorGrid({ items, onToggle }: { items: ArmorEntry[]; onToggle: (id: string) => void }) {
   return (
     <GridShell empty={items.length === 0}>
       {items.map((a) => (
@@ -212,13 +271,13 @@ function ArmorGrid({ items }: { items: ArmorEntry[] }) {
           icon="armor"
           label={a.label}
           dim={!a.owned}
+          ring={a.staged ? 'jade' : a.locked ? 'gold' : 'none'}
+          onClick={a.locked ? undefined : () => onToggle(a.id)}
           badge={
-            a.owned ? (
-              a.stars !== null ? (
-                <Badge color={a.stars >= 4 ? 'var(--color-gold)' : 'var(--color-jade)'}>{'★'.repeat(a.stars) || '0★'}</Badge>
-              ) : (
-                <Badge color="var(--color-jade)">✓</Badge>
-              )
+            a.stars !== null ? (
+              <Badge color={a.stars >= 4 ? 'var(--color-gold)' : 'var(--color-jade)'}>{'★'.repeat(a.stars) || '0★'}</Badge>
+            ) : a.staged ? (
+              <Badge color="var(--color-jade)">✓</Badge>
             ) : undefined
           }
         />
@@ -238,11 +297,11 @@ function ToggleGrid({ items, onToggle }: { items: ToggleableEntry[]; onToggle: (
           label={f.label}
           dim={!f.owned}
           ring={f.staged ? 'jade' : f.owned ? 'gold' : 'none'}
-          onClick={() => onToggle(f.groupId, f.id)}
+          onClick={f.locked ? undefined : () => onToggle(f.groupId, f.id)}
           badge={
             f.staged ? (
               <Badge color="var(--color-jade)">{t('inventory.staged')}</Badge>
-            ) : f.owned ? (
+            ) : f.locked ? (
               <Badge color="var(--color-gold)">{t('save.detected')}</Badge>
             ) : undefined
           }
