@@ -1,17 +1,28 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store/appStore'
 import { useDataset } from '../lib/useDataset'
-import { buildArmor, buildKeyItems, buildMaterials } from '../lib/inventory'
+import { buildArmor, buildKeyItems, buildMaterials, buildToggleable, type ArmorEntry, type KeyItemEntry, type MaterialEntry, type ToggleableEntry } from '../lib/inventory'
 import { getSessionSave } from '../lib/saveSession'
+import { TypeIcon, type IconKind } from '../components/TypeIcon'
 
-type Tab = 'materials' | 'key_items' | 'armor'
+type Tab = 'materials' | 'key_items' | 'armor' | 'fabrics' | 'fabrics_amiibo'
+
+const TAB_ICON: Record<Tab, IconKind> = {
+  materials: 'fruit',
+  key_items: 'key',
+  armor: 'armor',
+  fabrics: 'fabric',
+  fabrics_amiibo: 'fabric',
+}
 
 export function Inventory() {
   const { t } = useTranslation()
   const data = useDataset()
   const manual = useAppStore((s) => s.manual)
   const fromSave = useAppStore((s) => s.fromSave)
+  const toggleManual = useAppStore((s) => s.toggleManual)
   const [tab, setTab] = useState<Tab>('materials')
   const [query, setQuery] = useState('')
   const hasSession = !!getSessionSave()
@@ -19,6 +30,8 @@ export function Inventory() {
   const materials = useMemo(() => buildMaterials(data, manual, fromSave), [data, manual, fromSave])
   const keyItems = useMemo(() => buildKeyItems(data, manual, fromSave), [data, manual, fromSave])
   const armor = useMemo(() => buildArmor(data, manual, fromSave), [data, manual, fromSave])
+  const fabrics = useMemo(() => buildToggleable(data, manual, fromSave, 'fabrics'), [data, manual, fromSave])
+  const amiibo = useMemo(() => buildToggleable(data, manual, fromSave, 'fabrics_amiibo'), [data, manual, fromSave])
 
   const q = query.trim().toLowerCase()
   const filteredMaterials = materials
@@ -30,35 +43,54 @@ export function Inventory() {
   const filteredArmor = armor
     .filter((a) => !q || a.label.toLowerCase().includes(q))
     .sort((a, b) => Number(b.owned) - Number(a.owned) || (b.stars ?? -1) - (a.stars ?? -1) || a.label.localeCompare(b.label))
+  const filteredFabrics = fabrics
+    .filter((f) => !q || f.label.toLowerCase().includes(q))
+    .sort((a, b) => Number(b.owned) - Number(a.owned) || a.label.localeCompare(b.label))
+  const filteredAmiibo = amiibo
+    .filter((f) => !q || f.label.toLowerCase().includes(q))
+    .sort((a, b) => Number(b.owned) - Number(a.owned) || a.label.localeCompare(b.label))
 
-  const ownedMaterials = materials.filter((m) => m.owned).length
-  const ownedKeyItems = keyItems.filter((k) => k.owned).length
-  const ownedArmor = armor.filter((a) => a.owned).length
+  const counts: Record<Tab, string> = {
+    materials: `${materials.filter((m) => m.owned).length}/${materials.length}`,
+    key_items: `${keyItems.filter((k) => k.owned).length}/${keyItems.length}`,
+    armor: `${armor.filter((a) => a.owned).length}/${armor.length}`,
+    fabrics: `${fabrics.filter((f) => f.owned).length}/${fabrics.length}`,
+    fabrics_amiibo: `${amiibo.filter((f) => f.owned).length}/${amiibo.length}`,
+  }
 
-  const TABS: { id: Tab; label: string; count: string }[] = [
-    { id: 'materials', label: t('inventory.materials'), count: `${ownedMaterials}/${materials.length}` },
-    { id: 'key_items', label: t('inventory.keyItems'), count: `${ownedKeyItems}/${keyItems.length}` },
-    { id: 'armor', label: t('inventory.armor'), count: `${ownedArmor}/${armor.length}` },
-  ]
+  const anyStaged = fabrics.some((f) => f.staged) || amiibo.some((f) => f.staged)
+
+  const TABS: Tab[] = ['materials', 'key_items', 'armor', 'fabrics', 'fabrics_amiibo']
+  const tabLabel = (tb: Tab): string => {
+    if (tb === 'fabrics' || tb === 'fabrics_amiibo') {
+      const key = `groups.${tb}`
+      const translated = t(key)
+      if (translated !== key) return translated
+      return data.stats.find((s) => s.id === tb)?.label ?? tb
+    }
+    return t(`inventory.${tb === 'key_items' ? 'keyItems' : tb}`)
+  }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-4xl">
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <h2 className="font-display text-lg">{t('inventory.title')}</h2>
       </div>
 
-      {!hasSession && (
-        <p className="panel mb-3 px-3 py-2 text-xs text-ink-mute">{t('inventory.noSession')}</p>
-      )}
+      {!hasSession && <p className="panel mb-3 px-3 py-2 text-xs text-ink-mute">{t('inventory.noSession')}</p>}
 
-      <div className="mb-3 flex gap-2">
+      {/* barra de abas estilo menu do jogo (L ... R) */}
+      <div className="panel mb-3 flex items-center gap-1 overflow-x-auto p-1.5">
         {TABS.map((tb) => (
           <button
-            key={tb.id}
-            onClick={() => setTab(tb.id)}
-            className={`panel flex-1 px-2.5 py-2 text-xs transition-colors ${tab === tb.id ? 'text-jade' : 'text-ink-faint'}`}
+            key={tb}
+            onClick={() => setTab(tb)}
+            className="flex shrink-0 flex-col items-center gap-1 px-3 py-2 transition-colors"
+            style={{ color: tab === tb ? 'var(--color-jade)' : 'var(--color-ink-faint)' }}
           >
-            {tb.label} <span className="font-mono">{tb.count}</span>
+            <TypeIcon kind={TAB_ICON[tb]} size={20} />
+            <span className="max-w-16 truncate text-[10px]">{tabLabel(tb)}</span>
+            <span className="font-mono text-[9px] text-ink-faint">{counts[tb]}</span>
           </button>
         ))}
       </div>
@@ -70,61 +102,152 @@ export function Inventory() {
         className="panel mb-3 w-full bg-stone px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none"
       />
 
-      {tab === 'materials' && (
-        <ul className="space-y-1">
-          {filteredMaterials.map((m) => (
-            <li key={m.id} className="panel flex items-center gap-3 px-3 py-2.5" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 46px' }}>
-              <span className={`min-w-0 flex-1 truncate text-sm ${m.owned ? 'text-ink' : 'text-ink-faint'}`}>{m.label}</span>
-              {m.qty !== null ? (
-                <span className="font-mono text-sm" style={{ color: m.qty > 0 ? 'var(--color-jade)' : 'var(--color-ink-faint)' }}>
-                  ×{m.qty}
-                </span>
-              ) : (
-                <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">{m.owned ? t('inventory.owned') : '—'}</span>
-              )}
-            </li>
-          ))}
-          {filteredMaterials.length === 0 && <p className="py-8 text-center text-sm text-ink-mute">{t('tracker.empty')}</p>}
-        </ul>
+      {(tab === 'fabrics' || tab === 'fabrics_amiibo') && (
+        <p className="mb-3 text-xs text-ink-faint">
+          {anyStaged ? t('inventory.editHintStaged') : t('inventory.editHint')}{' '}
+          {anyStaged && (
+            <Link to="/save" className="underline decoration-edge-lit underline-offset-2 hover:text-jade">
+              {t('inventory.goToSave')}
+            </Link>
+          )}
+        </p>
       )}
 
-      {tab === 'key_items' && (
-        <ul className="space-y-1">
-          {filteredKeyItems.map((k) => (
-            <li key={k.id} className="panel flex items-center gap-3 px-3 py-2.5" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 46px' }}>
-              <span className={`min-w-0 flex-1 truncate text-sm ${k.owned ? 'text-ink' : 'text-ink-faint'}`}>{k.label}</span>
-              {k.owned && (
-                <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
-                  <path d="M2 6.5 5 9l5-6" stroke="var(--color-jade)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              )}
-            </li>
-          ))}
-          {filteredKeyItems.length === 0 && <p className="py-8 text-center text-sm text-ink-mute">{t('tracker.empty')}</p>}
-        </ul>
-      )}
-
-      {tab === 'armor' && (
-        <ul className="space-y-1">
-          {filteredArmor.map((a) => (
-            <li key={a.id} className="panel flex items-center gap-3 px-3 py-2.5" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 46px' }}>
-              <span className={`min-w-0 flex-1 truncate text-sm ${a.owned ? 'text-ink' : 'text-ink-faint'}`}>{a.label}</span>
-              {a.owned ? (
-                a.stars !== null ? (
-                  <span className="font-mono text-sm" style={{ color: a.stars >= 4 ? 'var(--color-gold)' : 'var(--color-jade)' }}>
-                    {'★'.repeat(a.stars) || '0★'}
-                  </span>
-                ) : (
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">{t('inventory.owned')}</span>
-                )
-              ) : (
-                <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">—</span>
-              )}
-            </li>
-          ))}
-          {filteredArmor.length === 0 && <p className="py-8 text-center text-sm text-ink-mute">{t('tracker.empty')}</p>}
-        </ul>
-      )}
+      {tab === 'materials' && <MaterialGrid items={filteredMaterials} />}
+      {tab === 'key_items' && <KeyItemGrid items={filteredKeyItems} />}
+      {tab === 'armor' && <ArmorGrid items={filteredArmor} />}
+      {tab === 'fabrics' && <ToggleGrid items={filteredFabrics} onToggle={toggleManual} />}
+      {tab === 'fabrics_amiibo' && <ToggleGrid items={filteredAmiibo} onToggle={toggleManual} />}
     </div>
+  )
+}
+
+function GridShell({ children, empty }: { children: React.ReactNode; empty: boolean }) {
+  const { t } = useTranslation()
+  if (empty) return <p className="py-8 text-center text-sm text-ink-mute">{t('tracker.empty')}</p>
+  return <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">{children}</div>
+}
+
+function Card({
+  icon,
+  label,
+  badge,
+  dim,
+  ring,
+  onClick,
+}: {
+  icon: IconKind
+  label: string
+  badge?: React.ReactNode
+  dim?: boolean
+  ring?: 'jade' | 'gold' | 'none'
+  onClick?: () => void
+}) {
+  const As = onClick ? 'button' : 'div'
+  return (
+    <As
+      onClick={onClick}
+      className={`panel relative flex aspect-square flex-col items-center justify-center gap-1.5 p-2 text-center transition-transform ${onClick ? 'cursor-pointer hover:scale-[1.03]' : ''} ${ring === 'jade' ? 'rune-pulse' : ''}`}
+      style={{
+        opacity: dim ? 0.45 : 1,
+        borderColor: ring === 'gold' ? 'var(--color-gold)' : ring === 'jade' ? 'var(--color-jade)' : undefined,
+        boxShadow: ring === 'gold' ? 'var(--glow-gold)' : ring === 'jade' ? 'var(--glow-jade)' : undefined,
+      }}
+    >
+      <span style={{ color: dim ? 'var(--color-ink-faint)' : 'var(--color-ink)' }}>
+        <TypeIcon kind={icon} size={26} />
+      </span>
+      <span className="line-clamp-2 min-w-0 text-[10px] leading-tight text-ink-mute">{label}</span>
+      {badge && <span className="absolute right-1 top-1">{badge}</span>}
+    </As>
+  )
+}
+
+function Badge({ children, color }: { children: React.ReactNode; color: string }) {
+  return (
+    <span className="rounded-full px-1.5 py-0.5 font-mono text-[9px] font-medium" style={{ background: 'var(--color-abyss)', color, boxShadow: `0 0 0 1px ${color}55` }}>
+      {children}
+    </span>
+  )
+}
+
+function MaterialGrid({ items }: { items: MaterialEntry[] }) {
+  return (
+    <GridShell empty={items.length === 0}>
+      {items.map((m) => (
+        <Card
+          key={m.id}
+          icon={m.bucket}
+          label={m.label}
+          dim={!m.owned}
+          badge={
+            m.qty !== null ? (
+              <Badge color={m.qty > 0 ? 'var(--color-jade)' : 'var(--color-ink-faint)'}>×{m.qty}</Badge>
+            ) : m.owned ? (
+              <Badge color="var(--color-jade)">✓</Badge>
+            ) : undefined
+          }
+        />
+      ))}
+    </GridShell>
+  )
+}
+
+function KeyItemGrid({ items }: { items: KeyItemEntry[] }) {
+  return (
+    <GridShell empty={items.length === 0}>
+      {items.map((k) => (
+        <Card key={k.id} icon="key" label={k.label} dim={!k.owned} badge={k.owned ? <Badge color="var(--color-jade)">✓</Badge> : undefined} />
+      ))}
+    </GridShell>
+  )
+}
+
+function ArmorGrid({ items }: { items: ArmorEntry[] }) {
+  return (
+    <GridShell empty={items.length === 0}>
+      {items.map((a) => (
+        <Card
+          key={a.id}
+          icon="armor"
+          label={a.label}
+          dim={!a.owned}
+          badge={
+            a.owned ? (
+              a.stars !== null ? (
+                <Badge color={a.stars >= 4 ? 'var(--color-gold)' : 'var(--color-jade)'}>{'★'.repeat(a.stars) || '0★'}</Badge>
+              ) : (
+                <Badge color="var(--color-jade)">✓</Badge>
+              )
+            ) : undefined
+          }
+        />
+      ))}
+    </GridShell>
+  )
+}
+
+function ToggleGrid({ items, onToggle }: { items: ToggleableEntry[]; onToggle: (groupId: string, itemId: string) => void }) {
+  const { t } = useTranslation()
+  return (
+    <GridShell empty={items.length === 0}>
+      {items.map((f) => (
+        <Card
+          key={f.id}
+          icon="fabric"
+          label={f.label}
+          dim={!f.owned}
+          ring={f.staged ? 'jade' : f.owned ? 'gold' : 'none'}
+          onClick={() => onToggle(f.groupId, f.id)}
+          badge={
+            f.staged ? (
+              <Badge color="var(--color-jade)">{t('inventory.staged')}</Badge>
+            ) : f.owned ? (
+              <Badge color="var(--color-gold)">{t('save.detected')}</Badge>
+            ) : undefined
+          }
+        />
+      ))}
+    </GridShell>
   )
 }

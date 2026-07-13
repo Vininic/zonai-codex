@@ -670,6 +670,7 @@ function ArmorPlanCard({ plan, groupName }: { plan: ArmorPlan; groupName: (id: s
               <MaterialRow key={c.material} cost={c} />
             ))}
           </div>
+          {plan.totals.every((c) => c.owned === null) && <p className="mt-1.5 text-[10px] text-ink-faint">{t('companion.noStockHint')}</p>}
         </div>
       )}
 

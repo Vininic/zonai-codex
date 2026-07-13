@@ -2,6 +2,7 @@ import type { CompletionData, Stat, StatItem } from './dataset'
 import { readString64Array, parseSave } from './saveParser'
 import { getSessionSave } from './saveSession'
 import type { Progress } from '../store/appStore'
+import { classifyMaterial, type MaterialBucket } from './materialIcon'
 
 /**
  * Leitura do pouch pra tab de Inventário: quantidade de materiais e estrelas
@@ -12,9 +13,21 @@ import type { Progress } from '../store/appStore'
 export interface MaterialEntry {
   id: string
   label: string
+  bucket: MaterialBucket
   /** null = sem save na sessão (quantidade desconhecida) */
   qty: number | null
   owned: boolean
+}
+
+/** fabrics / fabrics_amiibo: kind 'positive', graváveis pelo editor v1 — a
+ * única parte do Inventário com edição real hoje (ver saveWriter.ts). */
+export interface ToggleableEntry {
+  id: string
+  groupId: string
+  label: string
+  owned: boolean
+  /** marcado manualmente mas ainda não gravado no save */
+  staged: boolean
 }
 
 export interface KeyItemEntry {
@@ -65,8 +78,24 @@ export function buildMaterials(data: CompletionData, manual: Progress, fromSave:
   return stat.items.map((item) => ({
     id: item.id,
     label: item.label ?? item.id,
+    bucket: classifyMaterial(item.actorName, item.label ?? item.id),
     qty: stock ? (stock.get(item.actorName ?? '') ?? 0) : null,
     owned: !!(m[item.id] || s[item.id]),
+  }))
+}
+
+/** fabrics ou fabrics_amiibo: ambos kind 'positive', graváveis. */
+export function buildToggleable(data: CompletionData, manual: Progress, fromSave: Progress, groupId: string): ToggleableEntry[] {
+  const stat = data.stats.find((s) => s.id === groupId)
+  if (!stat) return []
+  const m = manual[groupId] ?? {}
+  const s = fromSave[groupId] ?? {}
+  return stat.items.map((item) => ({
+    id: item.id,
+    groupId,
+    label: item.label ?? item.id,
+    owned: !!(m[item.id] || s[item.id]),
+    staged: !!m[item.id] && !s[item.id],
   }))
 }
 
