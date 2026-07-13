@@ -191,48 +191,81 @@ function MaterialGrid({
   onChange: (id: string, qty: number) => void
   onClear: (id: string) => void
 }) {
-  if (items.length === 0) return <GridShell empty />
   return (
-    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+    <GridShell empty={items.length === 0}>
       {items.map((m) => (
-        <div
-          key={m.id}
-          className="panel relative flex aspect-square flex-col items-center justify-center gap-1 p-2 text-center"
-          style={{
-            opacity: m.owned || m.staged ? 1 : 0.55,
-            borderColor: m.staged ? 'var(--color-jade)' : undefined,
-            boxShadow: m.staged ? 'var(--glow-jade)' : undefined,
-          }}
-        >
-          {m.staged && (
-            <button
-              onClick={() => onClear(m.id)}
-              className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-full font-mono text-[10px] text-ink-faint hover:text-gloom"
-              title="reset"
-              aria-label="reset"
-            >
-              ×
-            </button>
-          )}
-          <span style={{ color: m.owned ? 'var(--color-ink)' : 'var(--color-ink-faint)' }}>
-            <TypeIcon kind={m.bucket} size={24} />
-          </span>
-          <span className="line-clamp-2 min-w-0 text-[10px] leading-tight text-ink-mute">{m.label}</span>
-          {hasSession ? (
-            <input
-              type="number"
-              min={0}
-              max={999}
-              value={m.qty ?? 0}
-              onChange={(e) => onChange(m.id, Number(e.target.value))}
-              className="w-11 bg-transparent text-center font-mono text-[11px]"
-              style={{ color: m.staged ? 'var(--color-jade)' : m.qty && m.qty > 0 ? 'var(--color-ink)' : 'var(--color-ink-faint)' }}
-            />
-          ) : (
-            <span className="font-mono text-[10px] text-ink-faint">{m.owned ? '✓' : '—'}</span>
-          )}
-        </div>
+        <MaterialCard key={m.id} item={m} hasSession={hasSession} onChange={onChange} onClear={onClear} />
       ))}
+    </GridShell>
+  )
+}
+
+function MaterialCard({
+  item: m,
+  hasSession,
+  onChange,
+  onClear,
+}: {
+  item: MaterialEntry
+  hasSession: boolean
+  onChange: (id: string, qty: number) => void
+  onClear: (id: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  const commit = () => {
+    setEditing(false)
+    const n = Number(draft)
+    if (draft.trim() !== '' && Number.isFinite(n) && n !== (m.qty ?? 0)) onChange(m.id, Math.max(0, Math.min(999, Math.round(n))))
+  }
+
+  return (
+    <div
+      className={`panel relative flex aspect-square flex-col items-center justify-center gap-1.5 p-2 text-center transition-transform ${hasSession ? 'cursor-pointer hover:scale-[1.03]' : ''}`}
+      style={{
+        opacity: m.owned || m.staged ? 1 : 0.45,
+        borderColor: m.staged ? 'var(--color-jade)' : undefined,
+        boxShadow: m.staged ? 'var(--glow-jade)' : undefined,
+      }}
+      onClick={hasSession && !editing ? () => { setDraft(String(m.qty ?? 0)); setEditing(true) } : undefined}
+    >
+      {m.staged && !editing && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onClear(m.id) }}
+          className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-full font-mono text-[10px] text-ink-faint hover:text-gloom"
+          title="reset"
+          aria-label="reset"
+        >
+          ×
+        </button>
+      )}
+      <span style={{ color: m.owned ? 'var(--color-ink)' : 'var(--color-ink-faint)' }}>
+        <TypeIcon kind={m.bucket} size={26} />
+      </span>
+      <span className="line-clamp-2 min-w-0 text-[10px] leading-tight text-ink-mute">{m.label}</span>
+      {editing ? (
+        <input
+          autoFocus
+          type="number"
+          min={0}
+          max={999}
+          value={draft}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => e.key === 'Enter' && commit()}
+          className="panel w-14 bg-stone-2 px-1 py-0.5 text-center font-mono text-xs text-ink focus:outline-none"
+        />
+      ) : (
+        <span className="absolute right-1 top-1">
+          {m.qty !== null ? (
+            <Badge color={m.staged ? 'var(--color-jade)' : m.qty > 0 ? 'var(--color-jade)' : 'var(--color-ink-faint)'}>×{m.qty}</Badge>
+          ) : m.owned ? (
+            <Badge color="var(--color-jade)">✓</Badge>
+          ) : undefined}
+        </span>
+      )}
     </div>
   )
 }
