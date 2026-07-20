@@ -14,3 +14,4 @@ fixtures/
 .env
 .env.*
 .vercel
+.claude/
