@@ -12,6 +12,8 @@ import { REGIONS, regionById } from '../lib/regions'
 import { categoryMeta } from '../lib/categoryMeta'
 import { computeProgress } from '../lib/useDataset'
 import { PlanFlow, type FlowStepDef } from '../components/PlanFlow'
+import { RouteArtifact } from '../components/RouteArtifact'
+import { optimizeRoute, type OptimizedRoute } from '../lib/routePlanner'
 import { useAppStore, type RouteStep } from '../store/appStore'
 
 interface CollectPlan {
@@ -64,6 +66,8 @@ export function Companion() {
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
+  /** rota aberta no painel lateral (o "artefato") */
+  const [artifact, setArtifact] = useState<{ route: OptimizedRoute; title: string } | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
 
   const armorLabels = useMemo(() => allArmorLabels(data), [data])
@@ -142,6 +146,25 @@ export function Companion() {
       .slice(0, 8)
       .map((g) => ({ id: g.id, name: groupName(g.id), done: g.done, total: g.total }))
     return { type: 'summary', rows }
+  }
+
+  /** abre o painel de rota à direita do chat */
+  function traceRoute(
+    categoryIds: string[],
+    layer: string,
+    title: string,
+    bounds?: { x1: number; x2: number; z1: number; z2: number },
+  ) {
+    const route = optimizeRoute(data, manual, fromSave, {
+      categories: new Set(categoryIds),
+      layer,
+      origin:
+        player?.position && player.position.layer === layer
+          ? { x: player.position.x, z: player.position.z }
+          : null,
+      bounds,
+    })
+    if (route.stops.length) setArtifact({ route, title })
   }
 
   async function handleAsk(text: string) {
@@ -224,7 +247,13 @@ export function Companion() {
   const empty = messages.length === 0
 
   return (
-    <div className="mx-auto flex h-[calc(100dvh-190px)] max-w-4xl flex-col lg:h-[calc(100dvh-110px)]">
+    <div
+      className={`mx-auto flex h-[calc(100dvh-190px)] gap-4 lg:h-[calc(100dvh-110px)] ${
+        artifact ? 'max-w-7xl' : 'max-w-4xl'
+      }`}
+    >
+      {/* coluna do chat — encolhe quando o artefato abre */}
+      <div className={`flex min-w-0 flex-col ${artifact ? 'hidden lg:flex lg:flex-1' : 'flex-1'}`}>
       {/* topo: identidade + config IA */}
       <div className="mb-2 flex items-center justify-between">
         {!empty ? (
@@ -264,10 +293,32 @@ export function Companion() {
                 <PurahFace size={30} />
                 <div className="min-w-0 max-w-[90%] flex-1 space-y-2">
                   {m.text && <p className="whitespace-pre-wrap text-sm leading-relaxed">{m.text}</p>}
-                  {m.plan?.type === 'collect' && <CollectPlanCard plan={m.plan} groupName={groupName} />}
+                  {m.plan?.type === 'collect' && (
+                    <CollectPlanCard
+                      plan={m.plan}
+                      groupName={groupName}
+                      onTrace={(p) => traceRoute([p.categoryId], p.layer, groupName(p.categoryId))}
+                    />
+                  )}
                   {m.plan?.type === 'armor' && <ArmorPlanCard plan={m.plan.plan} groupName={groupName} />}
                   {m.plan?.type === 'summary' && <SummaryCard plan={m.plan} />}
-                  {m.plan?.type === 'region' && <RegionPlanCard plan={m.plan.plan} groupName={groupName} />}
+                  {m.plan?.type === 'region' && (
+                    <RegionPlanCard
+                      plan={m.plan.plan}
+                      groupName={groupName}
+                      onTrace={(p) => {
+                        const region = regionById(p.regionId)
+                        if (!region) return
+                        const layer = p.route[0]?.layer ?? 'surface'
+                        traceRoute(
+                          [...new Set(p.steps.map((s) => s.categoryId))],
+                          layer,
+                          p.regionName,
+                          region.box,
+                        )
+                      }}
+                    />
+                  )}
                 </div>
               </div>
             ),
@@ -319,6 +370,14 @@ export function Companion() {
           </button>
         </form>
       </div>
+      </div>
+
+      {/* artefato: painel de rota, à direita do chat */}
+      {artifact && (
+        <div className="min-w-0 flex-1 lg:max-w-[26rem]">
+          <RouteArtifact route={artifact.route} title={artifact.title} onClose={() => setArtifact(null)} />
+        </div>
+      )}
     </div>
   )
 }
@@ -432,7 +491,15 @@ function PurahFace({ size }: { size: number }) {
   )
 }
 
-function CollectPlanCard({ plan, groupName }: { plan: CollectPlan; groupName: (id: string) => string }) {
+function CollectPlanCard({
+  plan,
+  groupName,
+  onTrace,
+}: {
+  plan: CollectPlan
+  groupName: (id: string) => string
+  onTrace: (plan: CollectPlan) => void
+}) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const setRoute = useAppStore((s) => s.setRoute)
@@ -458,20 +525,33 @@ function CollectPlanCard({ plan, groupName }: { plan: CollectPlan; groupName: (i
           </li>
         ))}
       </ol>
-      <button
-        onClick={() => {
-          setRoute(plan.steps)
-          navigate('/map')
-        }}
-        className="btn-jade !px-3 !py-1.5 !text-xs"
-      >
-        {t('companion.showOnMap')}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button onClick={() => onTrace(plan)} className="btn-jade !px-3 !py-1.5 !text-xs">
+          {t('route.trace')}
+        </button>
+        <button
+          onClick={() => {
+            setRoute(plan.steps)
+            navigate('/map')
+          }}
+          className="panel px-3 py-1.5 text-xs text-ink-mute transition-colors hover:text-jade"
+        >
+          {t('companion.showOnMap')}
+        </button>
+      </div>
     </div>
   )
 }
 
-function RegionPlanCard({ plan, groupName }: { plan: RegionPlan; groupName: (id: string) => string }) {
+function RegionPlanCard({
+  plan,
+  groupName,
+  onTrace,
+}: {
+  plan: RegionPlan
+  groupName: (id: string) => string
+  onTrace: (plan: RegionPlan) => void
+}) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const setRoute = useAppStore((s) => s.setRoute)
@@ -512,13 +592,16 @@ function RegionPlanCard({ plan, groupName }: { plan: RegionPlan; groupName: (id:
         </span>
       </div>
       <PlanFlow steps={steps} />
-      <div className="flex items-center gap-3 border-t border-edge/60 pt-2">
+      <div className="flex flex-wrap items-center gap-2 border-t border-edge/60 pt-2">
+        <button onClick={() => onTrace(plan)} className="btn-jade !px-3 !py-1.5 !text-xs">
+          {t('route.trace')}
+        </button>
         <button
           onClick={() => {
             setRoute(plan.route)
             navigate('/map')
           }}
-          className="btn-jade !px-3 !py-1.5 !text-xs"
+          className="panel px-3 py-1.5 text-xs text-ink-mute transition-colors hover:text-jade"
         >
           {t('companion.showOnMap')}
         </button>

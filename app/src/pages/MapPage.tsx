@@ -183,11 +183,29 @@ export function MapPage() {
 
     const steps = (route ?? []).filter((s) => s.layer === layer)
     if (steps.length === 0) return
-    const latlngs = steps.map((s) => toLatLng(s.x, s.z))
+
+    // a rota é quebrada em trechos: `legStart` marca uma parada alcançada por
+    // teleporte, então ligar ela à anterior desenharia uma caminhada que não
+    // existe. Cada trecho vira uma polilinha própria.
+    const segments: [number, number][][] = []
+    let current: [number, number][] = []
     if (player?.position && player.position.layer === layer) {
-      latlngs.unshift(toLatLng(player.position.x, player.position.z))
+      current.push(toLatLng(player.position.x, player.position.z))
     }
-    L.polyline(latlngs, { color: '#d9b96a', weight: 2, dashArray: '6 6', opacity: 0.9 }).addTo(group)
+    for (const s of steps) {
+      if (s.legStart && current.length) {
+        segments.push(current)
+        current = []
+      }
+      current.push(toLatLng(s.x, s.z))
+    }
+    if (current.length) segments.push(current)
+
+    for (const seg of segments) {
+      if (seg.length < 2) continue
+      L.polyline(seg, { color: '#d9b96a', weight: 2, dashArray: '6 6', opacity: 0.9 }).addTo(group)
+    }
+    const latlngs = steps.map((s) => toLatLng(s.x, s.z))
     steps.forEach((s, i) => {
       L.marker(toLatLng(s.x, s.z), {
         icon: L.divIcon({

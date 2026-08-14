@@ -9,6 +9,9 @@ export interface RouteStep {
   x: number
   z: number
   layer: string
+  /** primeira parada de uma perna: você chegou aqui teleportando, não andando.
+   *  O mapa quebra a linha aqui em vez de ligar a pé com a parada anterior. */
+  legStart?: boolean
 }
 
 /** conjuntos de ids serializados como Record pra persistir em JSON */
