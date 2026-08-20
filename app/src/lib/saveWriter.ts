@@ -1,7 +1,8 @@
 import { CLEAR_HASH, META_SAVE_TYPE, type PlayerStats } from './saveParser'
 import { murmur3 } from './murmur3'
 import type { CompletionData, Category, Stat, StatItem } from './dataset'
-import type { Progress } from '../store/appStore'
+import type { EquipmentGrant, PlayerEdits as PlayerEditsType, Progress } from '../store/appStore'
+import { equipArrays, modifierHash } from './equipment'
 
 /**
  * Editor v1 (§3.5 do plano): grava flags escalares no buffer clonado.
@@ -41,12 +42,7 @@ export function computeStaged(data: CompletionData, manual: Progress, fromSave: 
   return staged
 }
 
-export interface PlayerEdits {
-  rupees?: number
-  hearts?: number
-  staminaWheels?: number
-  batteryCells?: number
-}
+export type { PlayerEdits } from '../store/appStore'
 
 const H_RUPEES = murmur3('PlayerStatus.CurrentRupee')
 const H_MAX_LIFE = murmur3('PlayerStatus.MaxLife')
@@ -86,6 +82,9 @@ export interface ArrayWrite {
   /** ponteiro do array paralelo de estoque u32 (só materials) */
   stockPtr?: number
   stockValue?: number
+  /** arrays u32 paralelos indexados pelo mesmo slot (durabilidade, modificador
+   *  e valor do modificador, no caso de equipamento) */
+  ints?: { ptr: number; value: number }[]
 }
 
 export interface EditPlan {
@@ -94,6 +93,14 @@ export interface EditPlan {
   /** escritas nos arrays do pouch (materials/key_items/armor) */
   arrayWrites: ArrayWrite[]
   itemCount: number
+  /**
+   * Itens staged que este save NÃO consegue receber: a flag não existe na
+   * tabela de hashes do arquivo. O writer só altera entradas existentes — criar
+   * uma mudaria o tamanho/layout do save. Acontece de verdade: num save real
+   * v1.1.x, os 5 tecidos dos Sábios não tinham entrada, então "conceder" os 29
+   * amiibo gravava só 24. Sem esta lista o editor perdia 5 em silêncio.
+   */
+  skipped: { groupId: string; itemId: string }[]
 }
 
 /** lê um array String64 preservando índice (slots vazios viram '', diferente de saveParser.readString64Array) */
@@ -191,15 +198,17 @@ export function buildEditPlan(
   data: CompletionData,
   staged: StagedGroup[],
   selectedGroups: ReadonlySet<string>,
-  playerEdits: PlayerEdits,
+  playerEdits: PlayerEditsType,
   currentPlayer: PlayerStats | null,
   buffer: ArrayBuffer | null = null,
   values: Map<number, number> | null = null,
   materialQtyEdits: MaterialQtyEdit[] = [],
+  equipmentGrants: EquipmentGrant[] = [],
 ): EditPlan {
   const writes = new Map<number, number>()
   const arrayWrites: ArrayWrite[] = []
   const claimed = new Set<number>()
+  const skipped: { groupId: string; itemId: string }[] = []
   let itemCount = 0
   for (const sg of staged) {
     if (!sg.writable || !selectedGroups.has(sg.groupId)) continue
@@ -216,6 +225,13 @@ export function buildEditPlan(
     }
     for (const itemId of sg.itemIds) {
       const w = writesForItem(group, itemId)
+      // se a flag principal não existe na tabela deste save, applyEdits não tem
+      // onde escrever — registra como pulado em vez de sumir com ela
+      const primary = [...w.keys()][0]
+      if (values && primary !== undefined && !values.has(primary)) {
+        skipped.push({ groupId: sg.groupId, itemId })
+        continue
+      }
       if (w.size) itemCount++
       for (const [h, v] of w) writes.set(h, v)
     }
@@ -252,6 +268,40 @@ export function buildEditPlan(
     }
   }
 
+  // equipamento: cada grant ocupa um slot vazio do pouch da categoria e grava
+  // nome + durabilidade + modificador (hash) + valor do modificador
+  if (buffer && values && equipmentGrants.length) {
+    const claimedByCat = new Map<string, Set<number>>()
+    for (const grant of equipmentGrants) {
+      const arrays = equipArrays(values, grant.category, buffer)
+      if (!arrays) continue
+      const used = claimedByCat.get(grant.category) ?? new Set<number>()
+      claimedByCat.set(grant.category, used)
+
+      const names = readString64Raw(buffer, arrays.namePtr)
+      let idx = -1
+      for (let i = 0; i < names.length; i++) {
+        if (names[i] === '' && !used.has(i)) {
+          idx = i
+          break
+        }
+      }
+      if (idx === -1) continue // pouch cheio: nada a fazer, e nada é sobrescrito
+      used.add(idx)
+      arrayWrites.push({
+        namesPtr: arrays.namePtr,
+        index: idx,
+        actorName: grant.id,
+        ints: [
+          { ptr: arrays.lifePtr, value: Math.max(1, Math.round(grant.durability)) },
+          { ptr: arrays.effectTypePtr, value: modifierHash(grant.modifier) },
+          { ptr: arrays.effectValuePtr, value: grant.modifier === 'None' ? 0 : Math.max(0, Math.round(grant.modifierValue)) },
+        ],
+      })
+      itemCount++
+    }
+  }
+
   const p = currentPlayer
   if (playerEdits.rupees !== undefined && playerEdits.rupees !== p?.rupees)
     writes.set(H_RUPEES, Math.max(0, Math.min(999999, Math.round(playerEdits.rupees))))
@@ -261,7 +311,7 @@ export function buildEditPlan(
     writes.set(H_MAX_STAMINA, f32Bits(Math.max(1, Math.min(3, playerEdits.staminaWheels)) * 1000))
   if (playerEdits.batteryCells !== undefined && playerEdits.batteryCells !== p?.batteryCells)
     writes.set(H_MAX_ENERGY, f32Bits(Math.max(0, Math.min(48, playerEdits.batteryCells)) * 1000))
-  return { writes, arrayWrites, itemCount }
+  return { writes, arrayWrites, itemCount, skipped }
 }
 
 /** aplica o plano num clone do buffer original e devolve o novo save */
@@ -285,6 +335,9 @@ export function applyEdits(original: ArrayBuffer, plan: EditPlan): { buffer: Arr
     bytes.set(new TextEncoder().encode(aw.actorName))
     if (aw.stockPtr !== undefined && aw.stockValue !== undefined) {
       dv.setUint32(aw.stockPtr + 4 + aw.index * 4, aw.stockValue, true)
+    }
+    for (const { ptr, value } of aw.ints ?? []) {
+      dv.setUint32(ptr + 4 + aw.index * 4, value >>> 0, true)
     }
     applied++
   }

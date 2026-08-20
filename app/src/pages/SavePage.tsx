@@ -197,6 +197,12 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
   const fromSave = useAppStore((s) => s.fromSave)
   const player = useAppStore((s) => s.player)
   const materialQty = useAppStore((s) => s.materialQty)
+  // vive no store: como estado local, sumia ao trocar de página e o editor
+  // parecia não fazer nada
+  const edits = useAppStore((s) => s.playerEdits)
+  const setPlayerEdit = useAppStore((s) => s.setPlayerEdit)
+  const equipmentGrants = useAppStore((s) => s.equipmentGrants)
+  const removeEquipmentGrant = useAppStore((s) => s.removeEquipmentGrant)
 
   const session = getSessionSave()
   const parsedSession = useMemo(() => (session ? parseSave(session.buffer) : null), [session])
@@ -206,7 +212,6 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
   const materialQtyEdits = useMemo(() => Object.entries(materialQty).map(([itemId, qty]) => ({ itemId, qty })), [materialQty])
 
   const [selected, setSelected] = useState<Set<string>>(() => new Set(writable.map((s) => s.groupId)))
-  const [edits, setEdits] = useState<PlayerEdits>({})
 
   const groupName = (id: string, fallback: string) => {
     const key = `groups.${id}`
@@ -215,12 +220,14 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
   }
 
   const plan = useMemo(
-    () => buildEditPlan(data, staged, selected, edits, player, session?.buffer ?? null, parsedSession?.values ?? null, materialQtyEdits),
-    [data, staged, selected, edits, player, session, parsedSession, materialQtyEdits],
+    () =>
+      buildEditPlan(data, staged, selected, edits, player, session?.buffer ?? null, parsedSession?.values ?? null, materialQtyEdits, equipmentGrants),
+    [data, staged, selected, edits, player, session, parsedSession, materialQtyEdits, equipmentGrants],
   )
   const itemOnlyPlan = useMemo(
-    () => buildEditPlan(data, staged, selected, {}, null, session?.buffer ?? null, parsedSession?.values ?? null, materialQtyEdits),
-    [data, staged, selected, session, parsedSession, materialQtyEdits],
+    () =>
+      buildEditPlan(data, staged, selected, {}, null, session?.buffer ?? null, parsedSession?.values ?? null, materialQtyEdits, equipmentGrants),
+    [data, staged, selected, session, parsedSession, materialQtyEdits, equipmentGrants],
   )
   const playerChanges = plan.writes.size - itemOnlyPlan.writes.size
 
@@ -260,8 +267,13 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
         min={0}
         max={max}
         value={edits[key] ?? current ?? 0}
-        onChange={(e) => setEdits((prev) => ({ ...prev, [key]: Number(e.target.value) }))}
+        onChange={(e) => setPlayerEdit(key, Number(e.target.value))}
         className="panel w-full bg-stone px-2 py-1.5 font-mono text-sm text-ink focus:outline-none"
+        style={
+          edits[key] !== undefined && edits[key] !== current
+            ? { color: 'var(--color-jade)', borderColor: 'var(--color-jade)' }
+            : undefined
+        }
       />
     </label>
   )
@@ -308,7 +320,42 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
               </span>
             </div>
           )}
-          {writable.length === 0 && materialQtyEdits.length === 0 && <p className="text-xs text-ink-faint">{t('save.noStaged')}</p>}
+
+          {equipmentGrants.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs text-ink-mute">{t('save.equipmentStaged')}</p>
+              {equipmentGrants.map((g, i) => (
+                <div key={`${g.id}-${i}`} className="flex items-center gap-2 text-[12px]">
+                  <span className="min-w-0 flex-1 truncate">
+                    {g.id}
+                    {g.modifier !== 'None' && (
+                      <span className="text-ink-faint">
+                        {' '}
+                        · {g.modifier} +{g.modifierValue}
+                      </span>
+                    )}
+                  </span>
+                  <span className="shrink-0 font-mono text-[10px] text-ink-faint">{g.durability}</span>
+                  <button
+                    onClick={() => removeEquipmentGrant(i)}
+                    className="shrink-0 px-1 text-ink-faint hover:text-gloom"
+                    aria-label={t('common.close')}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {writable.length === 0 && materialQtyEdits.length === 0 && equipmentGrants.length === 0 && (
+            <p className="text-xs text-ink-faint">{t('save.noStaged')}</p>
+          )}
+
+          {plan.skipped.length > 0 && (
+            <p className="text-[11px] leading-relaxed" style={{ color: 'var(--color-gold)' }}>
+              {t('save.skippedWarning', { count: plan.skipped.length })}
+            </p>
+          )}
 
           {unsupported.length > 0 && (
             <p className="text-[11px] text-ink-faint">

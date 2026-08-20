@@ -38,6 +38,22 @@ export interface PlayerDelta {
   to: number
 }
 
+export interface PlayerEdits {
+  rupees?: number
+  hearts?: number
+  staminaWheels?: number
+  batteryCells?: number
+}
+
+export interface EquipmentGrant {
+  category: 'bows' | 'weapons' | 'shields'
+  id: string
+  durability: number
+  /** nome do modificador; gravado no save como hash murmur3 */
+  modifier: string
+  modifierValue: number
+}
+
 export interface ImportDiff {
   fromFile: string
   toFile: string
@@ -77,6 +93,12 @@ interface AppState {
   sidebarCollapsed: boolean
   /** quantidade desejada de material (id -> qtd), staged pro editor de save */
   materialQty: Record<string, number>
+  /** edições de player pendentes (rupees/corações/stamina/bateria).
+   *  Vive no store, e não no componente, senão sai da tela ao trocar de página
+   *  e o editor parece que "não faz nada" — foi exatamente esse o bug. */
+  playerEdits: PlayerEdits
+  /** equipamento a conceder em slots vazios do pouch, staged pro editor */
+  equipmentGrants: EquipmentGrant[]
 
   setLang: (lang: 'en' | 'pt') => void
   setTheme: (theme: 'dark' | 'light') => void
@@ -95,6 +117,11 @@ interface AppState {
   toggleSidebar: () => void
   setMaterialQty: (itemId: string, qty: number) => void
   clearMaterialQty: (itemId: string) => void
+  setMaterialQtyBulk: (entries: Record<string, number>) => void
+  setPlayerEdit: (key: keyof PlayerEdits, value: number) => void
+  clearPlayerEdits: () => void
+  addEquipmentGrant: (grant: EquipmentGrant) => void
+  removeEquipmentGrant: (index: number) => void
   /** restaura um backup JSON exportado */
   restore: (snapshot: Partial<Pick<AppState, 'manual' | 'fromSave' | 'player' | 'saveMeta' | 'excluded'>>) => void
 }
@@ -120,6 +147,8 @@ export const useAppStore = create<AppState>()(
       aiNarration: true,
       sidebarCollapsed: false,
       materialQty: {},
+      playerEdits: {},
+      equipmentGrants: [],
 
       setLang: (lang) => set({ lang }),
       setTheme: (theme) => set({ theme }),
@@ -159,6 +188,12 @@ export const useAppStore = create<AppState>()(
           delete materialQty[itemId]
           return { materialQty }
         }),
+      setMaterialQtyBulk: (entries) => set((s) => ({ materialQty: { ...s.materialQty, ...entries } })),
+      setPlayerEdit: (key, value) => set((s) => ({ playerEdits: { ...s.playerEdits, [key]: value } })),
+      clearPlayerEdits: () => set({ playerEdits: {} }),
+      addEquipmentGrant: (grant) => set((s) => ({ equipmentGrants: [...s.equipmentGrants, grant] })),
+      removeEquipmentGrant: (index) =>
+        set((s) => ({ equipmentGrants: s.equipmentGrants.filter((_, i) => i !== index) })),
       restore: (snapshot) => set(snapshot),
     }),
     { name: 'zonai-codex' },

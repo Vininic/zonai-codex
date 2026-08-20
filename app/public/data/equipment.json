@@ -1,0 +1,898 @@
+{
+ "bows": [
+  {
+   "id": "Weapon_Bow_001",
+   "label": "Traveler's Bow",
+   "durability": 22
+  },
+  {
+   "id": "Weapon_Bow_002",
+   "label": "Soldier's Bow",
+   "durability": 36
+  },
+  {
+   "id": "Weapon_Bow_003",
+   "label": "Spiked Boko Bow",
+   "durability": 20
+  },
+  {
+   "id": "Weapon_Bow_004",
+   "label": "Boko Bow",
+   "durability": 16
+  },
+  {
+   "id": "Weapon_Bow_006",
+   "label": "Lizal Bow",
+   "durability": 25
+  },
+  {
+   "id": "Weapon_Bow_009",
+   "label": "Lynel Bow",
+   "durability": 30
+  },
+  {
+   "id": "Weapon_Bow_011",
+   "label": "Strengthened Lizal Bow",
+   "durability": 35
+  },
+  {
+   "id": "Weapon_Bow_013",
+   "label": "Forest Dweller's Bow",
+   "durability": 35
+  },
+  {
+   "id": "Weapon_Bow_014",
+   "label": "Zora Bow",
+   "durability": 40
+  },
+  {
+   "id": "Weapon_Bow_015",
+   "label": "Gerudo Bow",
+   "durability": 40
+  },
+  {
+   "id": "Weapon_Bow_016",
+   "label": "Swallow Bow",
+   "durability": 30
+  },
+  {
+   "id": "Weapon_Bow_017",
+   "label": "Falcon Bow",
+   "durability": 35
+  },
+  {
+   "id": "Weapon_Bow_026",
+   "label": "Mighty Lynel Bow",
+   "durability": 35
+  },
+  {
+   "id": "Weapon_Bow_027",
+   "label": "Dragonbone Boko Bow",
+   "durability": 30
+  },
+  {
+   "id": "Weapon_Bow_028",
+   "label": "Great Eagle Bow",
+   "durability": 60
+  },
+  {
+   "id": "Weapon_Bow_029",
+   "label": "Phrenic Bow",
+   "durability": 45
+  },
+  {
+   "id": "Weapon_Bow_030",
+   "label": "Steel Lizal Bow",
+   "durability": 50
+  },
+  {
+   "id": "Weapon_Bow_032",
+   "label": "Savage Lynel Bow",
+   "durability": 45
+  },
+  {
+   "id": "Weapon_Bow_033",
+   "label": "Royal Guard's Bow",
+   "durability": 20
+  },
+  {
+   "id": "Weapon_Bow_035",
+   "label": "Knight's Bow",
+   "durability": 48
+  },
+  {
+   "id": "Weapon_Bow_036",
+   "label": "Royal Bow",
+   "durability": 60
+  },
+  {
+   "id": "Weapon_Bow_038",
+   "label": "Wooden Bow",
+   "durability": 20
+  },
+  {
+   "id": "Weapon_Bow_040",
+   "label": "Duplex Bow",
+   "durability": 18
+  },
+  {
+   "id": "Weapon_Bow_072",
+   "label": "Dusk Bow",
+   "durability": 40
+  },
+  {
+   "id": "Weapon_Bow_101",
+   "label": "Zonaite Bow",
+   "durability": 50
+  },
+  {
+   "id": "Weapon_Bow_104",
+   "label": "Construct Bow",
+   "durability": 18
+  },
+  {
+   "id": "Weapon_Bow_105",
+   "label": "Strong Construct Bow",
+   "durability": 26
+  },
+  {
+   "id": "Weapon_Bow_106",
+   "label": "Mighty Construct Bow",
+   "durability": 34
+  },
+  {
+   "id": "Weapon_Bow_107",
+   "label": "Old Wooden Bow",
+   "durability": 20
+  },
+  {
+   "id": "Weapon_Bow_166",
+   "label": "Demon King's Bow",
+   "durability": 42
+  }
+ ],
+ "shields": [
+  {
+   "id": "Weapon_Shield_001",
+   "label": "Wooden Shield",
+   "durability": 12
+  },
+  {
+   "id": "Weapon_Shield_002",
+   "label": "Soldier's Shield",
+   "durability": 16
+  },
+  {
+   "id": "Weapon_Shield_003",
+   "label": "Knight's Shield",
+   "durability": 23
+  },
+  {
+   "id": "Weapon_Shield_004",
+   "label": "Boko Shield",
+   "durability": 5
+  },
+  {
+   "id": "Weapon_Shield_005",
+   "label": "Spiked Boko Shield",
+   "durability": 7
+  },
+  {
+   "id": "Weapon_Shield_006",
+   "label": "Dragonbone Boko Shield",
+   "durability": 8
+  },
+  {
+   "id": "Weapon_Shield_007",
+   "label": "Lizal Shield",
+   "durability": 8
+  },
+  {
+   "id": "Weapon_Shield_008",
+   "label": "Reinforced Lizal Shield",
+   "durability": 12
+  },
+  {
+   "id": "Weapon_Shield_009",
+   "label": "Steel Lizal Shield",
+   "durability": 15
+  },
+  {
+   "id": "Weapon_Shield_016",
+   "label": "Lynel Shield",
+   "durability": 12
+  },
+  {
+   "id": "Weapon_Shield_017",
+   "label": "Mighty Lynel Shield",
+   "durability": 15
+  },
+  {
+   "id": "Weapon_Shield_018",
+   "label": "Savage Lynel Shield",
+   "durability": 20
+  },
+  {
+   "id": "Weapon_Shield_021",
+   "label": "Rusty Shield",
+   "durability": 16
+  },
+  {
+   "id": "Weapon_Shield_022",
+   "label": "Royal Shield",
+   "durability": 29
+  },
+  {
+   "id": "Weapon_Shield_023",
+   "label": "Forest Dweller's Shield",
+   "durability": 18
+  },
+  {
+   "id": "Weapon_Shield_025",
+   "label": "Zora Shield",
+   "durability": 20
+  },
+  {
+   "id": "Weapon_Shield_026",
+   "label": "Gerudo Shield",
+   "durability": 20
+  },
+  {
+   "id": "Weapon_Shield_030",
+   "label": "Hylian Shield",
+   "durability": 800
+  },
+  {
+   "id": "Weapon_Shield_031",
+   "label": "Hunter's Shield",
+   "durability": 10
+  },
+  {
+   "id": "Weapon_Shield_032",
+   "label": "Fisherman's Shield",
+   "durability": 10
+  },
+  {
+   "id": "Weapon_Shield_033",
+   "label": "Royal Guard's Shield",
+   "durability": 14
+  },
+  {
+   "id": "Weapon_Shield_034",
+   "label": "Emblazoned Shield",
+   "durability": 12
+  },
+  {
+   "id": "Weapon_Shield_035",
+   "label": "Traveler's Shield",
+   "durability": 12
+  },
+  {
+   "id": "Weapon_Shield_036",
+   "label": "Radiant Shield",
+   "durability": 26
+  },
+  {
+   "id": "Weapon_Shield_037",
+   "label": "Daybreaker",
+   "durability": 60
+  },
+  {
+   "id": "Weapon_Shield_040",
+   "label": "Pot Lid",
+   "durability": 10
+  },
+  {
+   "id": "Weapon_Shield_041",
+   "label": "Shield of the Mind's Eye",
+   "durability": 16
+  },
+  {
+   "id": "Weapon_Shield_042",
+   "label": "Kite Shield",
+   "durability": 16
+  },
+  {
+   "id": "Weapon_Shield_057",
+   "label": "Sea-Breeze Shield",
+   "durability": 90
+  },
+  {
+   "id": "Weapon_Shield_101",
+   "label": "Zonaite Shield",
+   "durability": 15
+  },
+  {
+   "id": "Weapon_Shield_102",
+   "label": "Strong Zonaite Shield",
+   "durability": 15
+  },
+  {
+   "id": "Weapon_Shield_103",
+   "label": "Mighty Zonaite Shield",
+   "durability": 20
+  },
+  {
+   "id": "Weapon_Shield_107",
+   "label": "Old Wooden Shield",
+   "durability": 12
+  }
+ ],
+ "weapons": [
+  {
+   "id": "Weapon_Lsword_001",
+   "label": "Traveler's Claymore",
+   "durability": 20
+  },
+  {
+   "id": "Weapon_Lsword_002",
+   "label": "Soldier's Claymore",
+   "durability": 25
+  },
+  {
+   "id": "Weapon_Lsword_003",
+   "label": "Knight's Claymore",
+   "durability": 30
+  },
+  {
+   "id": "Weapon_Lsword_019",
+   "label": "Moblin Arm",
+   "durability": 5
+  },
+  {
+   "id": "Weapon_Lsword_020",
+   "label": "Rusty Claymore",
+   "durability": 8
+  },
+  {
+   "id": "Weapon_Lsword_024",
+   "label": "Royal Claymore",
+   "durability": 40
+  },
+  {
+   "id": "Weapon_Lsword_027",
+   "label": "Zora Longsword",
+   "durability": 30
+  },
+  {
+   "id": "Weapon_Lsword_029",
+   "label": "Gerudo Claymore",
+   "durability": 14
+  },
+  {
+   "id": "Weapon_Lsword_036",
+   "label": "Cobble Crusher",
+   "durability": 30
+  },
+  {
+   "id": "Weapon_Lsword_038",
+   "label": "Boat Oar",
+   "durability": 8
+  },
+  {
+   "id": "Weapon_Lsword_041",
+   "label": "Eightfold Longblade",
+   "durability": 25
+  },
+  {
+   "id": "Weapon_Lsword_045",
+   "label": "Farming Hoe",
+   "durability": 6
+  },
+  {
+   "id": "Weapon_Lsword_047",
+   "label": "Royal Guard's Claymore",
+   "durability": 12
+  },
+  {
+   "id": "Weapon_Lsword_051",
+   "label": "Giant Boomerang",
+   "durability": 40
+  },
+  {
+   "id": "Weapon_Lsword_054",
+   "label": "Boulder Breaker",
+   "durability": 40
+  },
+  {
+   "id": "Weapon_Lsword_057",
+   "label": "Dusk Claymore",
+   "durability": 50
+  },
+  {
+   "id": "Weapon_Lsword_059",
+   "label": "Biggoron's Sword",
+   "durability": 60
+  },
+  {
+   "id": "Weapon_Lsword_060",
+   "label": "Fierce Deity Sword",
+   "durability": 35
+  },
+  {
+   "id": "Weapon_Lsword_101",
+   "label": "Zonaite Longsword",
+   "durability": 15
+  },
+  {
+   "id": "Weapon_Lsword_103",
+   "label": "Thick Stick",
+   "durability": 14
+  },
+  {
+   "id": "Weapon_Lsword_106",
+   "label": "Traveler's Claymore (decayed)",
+   "durability": 16
+  },
+  {
+   "id": "Weapon_Lsword_108",
+   "label": "Sturdy Thick Stick",
+   "durability": 26
+  },
+  {
+   "id": "Weapon_Lsword_109",
+   "label": "Gnarled Thick Stick",
+   "durability": 16
+  },
+  {
+   "id": "Weapon_Lsword_112",
+   "label": "Soldier's Claymore (decayed)",
+   "durability": 17
+  },
+  {
+   "id": "Weapon_Lsword_113",
+   "label": "Knight's Claymore (decayed)",
+   "durability": 18
+  },
+  {
+   "id": "Weapon_Lsword_114",
+   "label": "Eightfold Longblade (decayed)",
+   "durability": 18
+  },
+  {
+   "id": "Weapon_Lsword_124",
+   "label": "Royal Claymore (decayed)",
+   "durability": 20
+  },
+  {
+   "id": "Weapon_Lsword_127",
+   "label": "Zora Longsword (decayed)",
+   "durability": 20
+  },
+  {
+   "id": "Weapon_Lsword_129",
+   "label": "Gerudo Claymore (decayed)",
+   "durability": 10
+  },
+  {
+   "id": "Weapon_Lsword_136",
+   "label": "Cobble Crusher (decayed)",
+   "durability": 18
+  },
+  {
+   "id": "Weapon_Lsword_147",
+   "label": "Royal Guard's Claymore (decayed)",
+   "durability": 11
+  },
+  {
+   "id": "Weapon_Lsword_161",
+   "label": "Magic Scepter",
+   "durability": 14
+  },
+  {
+   "id": "Weapon_Lsword_163",
+   "label": "Strong Zonaite Longsword",
+   "durability": 16
+  },
+  {
+   "id": "Weapon_Lsword_164",
+   "label": "Mighty Zonaite Longsword",
+   "durability": 18
+  },
+  {
+   "id": "Weapon_Lsword_166",
+   "label": "Gloom Club",
+   "durability": 14
+  },
+  {
+   "id": "Weapon_Lsword_168",
+   "label": "Thick Stick (decayed)",
+   "durability": 14
+  },
+  {
+   "id": "Weapon_Lsword_174",
+   "label": "Giant Boomerang (decayed)",
+   "durability": 18
+  },
+  {
+   "id": "Weapon_Spear_001",
+   "label": "Traveler's Spear",
+   "durability": 30
+  },
+  {
+   "id": "Weapon_Spear_002",
+   "label": "Soldier's Spear",
+   "durability": 35
+  },
+  {
+   "id": "Weapon_Spear_003",
+   "label": "Knight's Halberd",
+   "durability": 40
+  },
+  {
+   "id": "Weapon_Spear_021",
+   "label": "Rusty Halberd",
+   "durability": 12
+  },
+  {
+   "id": "Weapon_Spear_022",
+   "label": "Farmer's Pitchfork",
+   "durability": 12
+  },
+  {
+   "id": "Weapon_Spear_024",
+   "label": "Royal Halberd",
+   "durability": 50
+  },
+  {
+   "id": "Weapon_Spear_025",
+   "label": "Forest Dweller's Spear",
+   "durability": 35
+  },
+  {
+   "id": "Weapon_Spear_027",
+   "label": "Zora Spear",
+   "durability": 40
+  },
+  {
+   "id": "Weapon_Spear_029",
+   "label": "Gerudo Spear",
+   "durability": 20
+  },
+  {
+   "id": "Weapon_Spear_030",
+   "label": "Throwing Spear",
+   "durability": 26
+  },
+  {
+   "id": "Weapon_Spear_032",
+   "label": "Feathered Spear",
+   "durability": 35
+  },
+  {
+   "id": "Weapon_Spear_036",
+   "label": "Wooden Mop",
+   "durability": 8
+  },
+  {
+   "id": "Weapon_Spear_038",
+   "label": "Fishing Harpoon",
+   "durability": 12
+  },
+  {
+   "id": "Weapon_Spear_047",
+   "label": "Royal Guard's Spear",
+   "durability": 15
+  },
+  {
+   "id": "Weapon_Spear_050",
+   "label": "Lightscale Trident",
+   "durability": 70
+  },
+  {
+   "id": "Weapon_Spear_101",
+   "label": "Zonaite Spear",
+   "durability": 22
+  },
+  {
+   "id": "Weapon_Spear_103",
+   "label": "Long Stick",
+   "durability": 18
+  },
+  {
+   "id": "Weapon_Spear_106",
+   "label": "Traveler's Spear (decayed)",
+   "durability": 24
+  },
+  {
+   "id": "Weapon_Spear_108",
+   "label": "Sturdy Long Stick",
+   "durability": 34
+  },
+  {
+   "id": "Weapon_Spear_109",
+   "label": "Gnarled Long Stick",
+   "durability": 22
+  },
+  {
+   "id": "Weapon_Spear_112",
+   "label": "Soldier's Spear (decayed)",
+   "durability": 25
+  },
+  {
+   "id": "Weapon_Spear_113",
+   "label": "Knight's Halberd (decayed)",
+   "durability": 26
+  },
+  {
+   "id": "Weapon_Spear_124",
+   "label": "Royal Halberd (decayed)",
+   "durability": 30
+  },
+  {
+   "id": "Weapon_Spear_125",
+   "label": "Forest Dweller's Spear (decayed)",
+   "durability": 24
+  },
+  {
+   "id": "Weapon_Spear_127",
+   "label": "Zora Spear (decayed)",
+   "durability": 26
+  },
+  {
+   "id": "Weapon_Spear_129",
+   "label": "Gerudo Spear (decayed)",
+   "durability": 15
+  },
+  {
+   "id": "Weapon_Spear_132",
+   "label": "Feathered Spear (decayed)",
+   "durability": 25
+  },
+  {
+   "id": "Weapon_Spear_147",
+   "label": "Royal Guard's Spear (decayed)",
+   "durability": 14
+  },
+  {
+   "id": "Weapon_Spear_161",
+   "label": "Magic Staff",
+   "durability": 14
+  },
+  {
+   "id": "Weapon_Spear_163",
+   "label": "Strong Zonaite Spear",
+   "durability": 24
+  },
+  {
+   "id": "Weapon_Spear_164",
+   "label": "Mighty Zonaite Spear",
+   "durability": 27
+  },
+  {
+   "id": "Weapon_Spear_166",
+   "label": "Gloom Spear",
+   "durability": 16
+  },
+  {
+   "id": "Weapon_Spear_168",
+   "label": "Long Stick (decayed)",
+   "durability": 18
+  },
+  {
+   "id": "Weapon_Spear_173",
+   "label": "Throwing Spear (decayed)",
+   "durability": 20
+  },
+  {
+   "id": "Weapon_Sword_001",
+   "label": "Traveler's Sword",
+   "durability": 20
+  },
+  {
+   "id": "Weapon_Sword_002",
+   "label": "Soldier's Broadsword",
+   "durability": 23
+  },
+  {
+   "id": "Weapon_Sword_003",
+   "label": "Knight's Broadsword",
+   "durability": 27
+  },
+  {
+   "id": "Weapon_Sword_019",
+   "label": "Bokoblin Arm",
+   "durability": 5
+  },
+  {
+   "id": "Weapon_Sword_020",
+   "label": "Lizalfos Arm",
+   "durability": 5
+  },
+  {
+   "id": "Weapon_Sword_021",
+   "label": "Rusty Broadsword",
+   "durability": 6
+  },
+  {
+   "id": "Weapon_Sword_022",
+   "label": "Soup Ladle",
+   "durability": 5
+  },
+  {
+   "id": "Weapon_Sword_024",
+   "label": "Royal Broadsword",
+   "durability": 35
+  },
+  {
+   "id": "Weapon_Sword_025",
+   "label": "Forest Dweller's Sword",
+   "durability": 27
+  },
+  {
+   "id": "Weapon_Sword_027",
+   "label": "Zora Sword",
+   "durability": 27
+  },
+  {
+   "id": "Weapon_Sword_029",
+   "label": "Gerudo Scimitar",
+   "durability": 14
+  },
+  {
+   "id": "Weapon_Sword_031",
+   "label": "Feathered Edge",
+   "durability": 27
+  },
+  {
+   "id": "Weapon_Sword_041",
+   "label": "Eightfold Blade",
+   "durability": 26
+  },
+  {
+   "id": "Weapon_Sword_043",
+   "label": "Torch",
+   "durability": 8
+  },
+  {
+   "id": "Weapon_Sword_044",
+   "label": "Tree Branch",
+   "durability": 4
+  },
+  {
+   "id": "Weapon_Sword_047",
+   "label": "Royal Guard's Sword",
+   "durability": 12
+  },
+  {
+   "id": "Weapon_Sword_051",
+   "label": "Boomerang",
+   "durability": 18
+  },
+  {
+   "id": "Weapon_Sword_052",
+   "label": "Scimitar of the Seven",
+   "durability": 60
+  },
+  {
+   "id": "Weapon_Sword_057",
+   "label": "White Sword of the Sky",
+   "durability": 45
+  },
+  {
+   "id": "Weapon_Sword_058",
+   "label": "Sword of the Hero",
+   "durability": 27
+  },
+  {
+   "id": "Weapon_Sword_059",
+   "label": "Sea-Breeze Boomerang",
+   "durability": 20
+  },
+  {
+   "id": "Weapon_Sword_070",
+   "label": "Master Sword",
+   "durability": 40
+  },
+  {
+   "id": "Weapon_Sword_101",
+   "label": "Zonaite Sword",
+   "durability": 15
+  },
+  {
+   "id": "Weapon_Sword_103",
+   "label": "Wooden Stick",
+   "durability": 12
+  },
+  {
+   "id": "Weapon_Sword_105",
+   "label": "Boomerang (decayed)",
+   "durability": 16
+  },
+  {
+   "id": "Weapon_Sword_106",
+   "label": "Traveler's Sword (decayed)",
+   "durability": 16
+  },
+  {
+   "id": "Weapon_Sword_107",
+   "label": "Lizal Boomerang",
+   "durability": 17
+  },
+  {
+   "id": "Weapon_Sword_108",
+   "label": "Sturdy Wooden Stick",
+   "durability": 24
+  },
+  {
+   "id": "Weapon_Sword_109",
+   "label": "Gnarled Wooden Stick",
+   "durability": 14
+  },
+  {
+   "id": "Weapon_Sword_112",
+   "label": "Soldier's Broadsword (decayed)",
+   "durability": 17
+  },
+  {
+   "id": "Weapon_Sword_113",
+   "label": "Knight's Broadsword (decayed)",
+   "durability": 18
+  },
+  {
+   "id": "Weapon_Sword_114",
+   "label": "Eightfold Blade (decayed)",
+   "durability": 16
+  },
+  {
+   "id": "Weapon_Sword_124",
+   "label": "Royal Broadsword (decayed)",
+   "durability": 20
+  },
+  {
+   "id": "Weapon_Sword_125",
+   "label": "Forest Dweller's Sword (decayed)",
+   "durability": 17
+  },
+  {
+   "id": "Weapon_Sword_127",
+   "label": "Zora Sword (decayed)",
+   "durability": 20
+  },
+  {
+   "id": "Weapon_Sword_129",
+   "label": "Gerudo Scimitar (decayed)",
+   "durability": 10
+  },
+  {
+   "id": "Weapon_Sword_131",
+   "label": "Feathered Edge (decayed)",
+   "durability": 18
+  },
+  {
+   "id": "Weapon_Sword_147",
+   "label": "Royal Guard's Sword (decayed)",
+   "durability": 10
+  },
+  {
+   "id": "Weapon_Sword_161",
+   "label": "Magic Rod",
+   "durability": 14
+  },
+  {
+   "id": "Weapon_Sword_163",
+   "label": "Strong Zonaite Sword",
+   "durability": 16
+  },
+  {
+   "id": "Weapon_Sword_164",
+   "label": "Mighty Zonaite Sword",
+   "durability": 18
+  },
+  {
+   "id": "Weapon_Sword_166",
+   "label": "Gloom Sword",
+   "durability": 15
+  },
+  {
+   "id": "Weapon_Sword_167",
+   "label": "Tree Branch (sky)",
+   "durability": 4
+  },
+  {
+   "id": "Weapon_Sword_168",
+   "label": "Wooden Stick (decayed)",
+   "durability": 12
+  }
+ ]
+}

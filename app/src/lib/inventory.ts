@@ -106,6 +106,58 @@ export function buildMaterials(
   })
 }
 
+/**
+ * Quanto de cada material falta pra levar TODA armadura possuída até 4★.
+ *
+ * Soma o custo dos níveis que ainda faltam em cada peça (pulando os que a peça
+ * já tem) e subtrai o estoque real do save. Devolve o mapa
+ * `materialItemId -> quantidade alvo` pronto pro editor — é o atalho pro grind
+ * mais chato do jogo (pedaço de dragão, fragmento de estrela, gema).
+ */
+export function armorUpgradeNeeds(
+  data: CompletionData,
+  manual: Progress,
+  fromSave: Progress,
+): { targets: Record<string, number>; rows: { label: string; have: number; need: number; missing: number }[] } {
+  const upgraded = data.stats.find((s) => s.id === 'armor_upgraded') as
+    | (Stat & { upgradeMaterials?: { materialStockArrayHash: string; armor: { label: string; levels: Record<string, { material: string; quantity: number }[]> }[] } })
+    | undefined
+  const block = upgraded?.upgradeMaterials
+  const inv = data.stats.find((s) => s.id === 'armor_inventory')
+  const materialsStat = data.stats.find((s) => s.id === 'materials')
+  if (!block || !inv || !materialsStat) return { targets: {}, rows: [] }
+
+  const armorEntries = buildArmor(data, manual, fromSave)
+  const starsByLabel = new Map(armorEntries.map((a) => [a.label, a]))
+
+  const need = new Map<string, number>()
+  for (const entry of block.armor) {
+    const state = starsByLabel.get(entry.label)
+    if (!state?.owned) continue
+    const stars = state.stars ?? 0
+    for (const [levelText, costs] of Object.entries(entry.levels)) {
+      if (parseInt(levelText, 10) <= stars) continue
+      for (const c of costs) need.set(c.material, (need.get(c.material) ?? 0) + c.quantity)
+    }
+  }
+
+  const materials = buildMaterials(data, manual, fromSave)
+  const byLabel = new Map(materials.map((m) => [m.label, m]))
+
+  const targets: Record<string, number> = {}
+  const rows: { label: string; have: number; need: number; missing: number }[] = []
+  for (const [label, total] of need) {
+    const mat = byLabel.get(label)
+    if (!mat) continue
+    const have = mat.rawQty ?? 0
+    if (have >= total) continue
+    targets[mat.id] = Math.min(999, total)
+    rows.push({ label, have, need: total, missing: total - have })
+  }
+  rows.sort((a, b) => b.missing - a.missing)
+  return { targets, rows }
+}
+
 /** fabrics ou fabrics_amiibo: ambos kind 'positive', graváveis. */
 export function buildToggleable(data: CompletionData, manual: Progress, fromSave: Progress, groupId: string): ToggleableEntry[] {
   const stat = data.stats.find((s) => s.id === groupId)

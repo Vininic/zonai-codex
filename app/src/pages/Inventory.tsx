@@ -3,12 +3,18 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store/appStore'
 import { useDataset } from '../lib/useDataset'
-import { buildArmor, buildKeyItems, buildMaterials, buildToggleable } from '../lib/inventory'
+import { armorUpgradeNeeds, buildArmor, buildKeyItems, buildMaterials, buildToggleable } from '../lib/inventory'
 import { getSessionSave } from '../lib/saveSession'
 import { TypeIcon, type IconKind } from '../components/TypeIcon'
+import { EquipmentTab } from '../components/EquipmentTab'
+import type { EquipCategory } from '../lib/equipment'
 import type { MaterialBucket } from '../lib/materialIcon'
 
-type Tab = 'materials' | 'key_items' | 'armor' | 'fabrics' | 'fabrics_amiibo'
+type Tab = 'materials' | 'key_items' | 'armor' | 'fabrics' | 'fabrics_amiibo' | 'bows' | 'weapons' | 'shields'
+
+/** abas de equipamento têm dados próprios (durabilidade/modificador) e UI própria */
+const EQUIP_TABS = ['bows', 'weapons', 'shields'] as const
+const isEquipTab = (t: Tab): t is EquipCategory => (EQUIP_TABS as readonly string[]).includes(t)
 
 const TAB_ICON: Record<Tab, IconKind> = {
   materials: 'fruit',
@@ -16,6 +22,9 @@ const TAB_ICON: Record<Tab, IconKind> = {
   armor: 'armor',
   fabrics: 'fabric',
   fabrics_amiibo: 'fabric',
+  bows: 'armor',
+  weapons: 'armor',
+  shields: 'armor',
 }
 
 /**
@@ -47,11 +56,13 @@ export function Inventory() {
   const materialQty = useAppStore((s) => s.materialQty)
   const setMaterialQty = useAppStore((s) => s.setMaterialQty)
   const clearMaterialQty = useAppStore((s) => s.clearMaterialQty)
+  const setMaterialQtyBulk = useAppStore((s) => s.setMaterialQtyBulk)
 
   const [tab, setTab] = useState<Tab>('materials')
   const [query, setQuery] = useState('')
   const [showAll, setShowAll] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [filled, setFilled] = useState<number | null>(null)
   const hasSession = !!getSessionSave()
 
   const materials = useMemo(() => buildMaterials(data, manual, fromSave, materialQty), [data, manual, fromSave, materialQty])
@@ -123,6 +134,10 @@ export function Inventory() {
         locked: f.locked,
         kindKey: 'inventory.amiibo',
       })),
+      // as abas de equipamento renderizam <EquipmentTab/> e não usam esta lista
+      bows: [],
+      weapons: [],
+      shields: [],
     }),
     [materials, keyItems, armor, fabrics, amiibo],
   )
@@ -137,7 +152,7 @@ export function Inventory() {
 
   const selected = slots.find((s) => s.id === selectedId) ?? slots[0] ?? null
 
-  const TABS: Tab[] = ['materials', 'key_items', 'armor', 'fabrics', 'fabrics_amiibo']
+  const TABS: Tab[] = ['materials', 'key_items', 'armor', 'fabrics', 'fabrics_amiibo', 'bows', 'weapons', 'shields']
   const tabLabel = (tb: Tab): string => {
     if (tb === 'fabrics' || tb === 'fabrics_amiibo') {
       const key = `groups.${tb}`
@@ -184,13 +199,19 @@ export function Inventory() {
           >
             <TypeIcon kind={TAB_ICON[tb]} size={20} />
             <span className="max-w-16 truncate text-[10px]">{tabLabel(tb)}</span>
-            <span className="font-mono text-[9px] text-ink-faint">
-              {ownedCount(tb)}/{slotsByTab[tb].length}
-            </span>
+            {!isEquipTab(tb) && (
+              <span className="font-mono text-[9px] text-ink-faint">
+                {ownedCount(tb)}/{slotsByTab[tb].length}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
+      {isEquipTab(tab) && <EquipmentTab category={tab} hasSession={hasSession} />}
+
+      {!isEquipTab(tab) && (
+      <>
       <div className="mb-3 flex gap-2">
         <input
           value={query}
@@ -206,7 +227,26 @@ export function Inventory() {
         >
           {showAll ? t('inventory.viewAll') : t('inventory.viewOwned')}
         </button>
+        {tab === 'materials' && hasSession && (
+          <button
+            onClick={() => {
+              const { targets, rows } = armorUpgradeNeeds(data, manual, fromSave)
+              setMaterialQtyBulk(targets)
+              setFilled(rows.length)
+            }}
+            className="panel shrink-0 px-3 py-2 text-xs text-ink-mute transition-colors hover:text-jade"
+            title={t('inventory.fillUpgradeHint')}
+          >
+            {t('inventory.fillUpgrade')}
+          </button>
+        )}
       </div>
+
+      {filled !== null && (
+        <p className="mb-3 text-xs" style={{ color: 'var(--color-jade)' }}>
+          {filled === 0 ? t('inventory.fillUpgradeNone') : t('inventory.fillUpgradeDone', { count: filled })}
+        </p>
+      )}
 
       <div className="grid gap-3 lg:grid-cols-[1fr_18rem]">
         {/* grade de slots */}
@@ -327,6 +367,8 @@ export function Inventory() {
           )}
         </aside>
       </div>
+      </>
+      )}
     </div>
   )
 }
