@@ -6,15 +6,18 @@ import { useDataset } from '../lib/useDataset'
 import { armorUpgradeNeeds, buildArmor, buildKeyItems, buildMaterials, buildToggleable } from '../lib/inventory'
 import { getSessionSave } from '../lib/saveSession'
 import { TypeIcon, type IconKind } from '../components/TypeIcon'
+import { ItemIcon } from '../components/ItemIcon'
 import { EquipmentTab } from '../components/EquipmentTab'
+import { HorsesTab } from '../components/HorsesTab'
 import type { EquipCategory } from '../lib/equipment'
 import type { MaterialBucket } from '../lib/materialIcon'
 
-type Tab = 'materials' | 'key_items' | 'armor' | 'fabrics' | 'fabrics_amiibo' | 'bows' | 'weapons' | 'shields'
+type Tab = 'materials' | 'key_items' | 'armor' | 'fabrics' | 'fabrics_amiibo' | 'bows' | 'weapons' | 'shields' | 'horses'
 
 /** abas de equipamento têm dados próprios (durabilidade/modificador) e UI própria */
 const EQUIP_TABS = ['bows', 'weapons', 'shields'] as const
 const isEquipTab = (t: Tab): t is EquipCategory => (EQUIP_TABS as readonly string[]).includes(t)
+const isCustomTab = (t: Tab) => isEquipTab(t) || t === 'horses'
 
 const TAB_ICON: Record<Tab, IconKind> = {
   materials: 'fruit',
@@ -25,6 +28,7 @@ const TAB_ICON: Record<Tab, IconKind> = {
   bows: 'armor',
   weapons: 'armor',
   shields: 'armor',
+  horses: 'horse',
 }
 
 /**
@@ -35,6 +39,7 @@ interface Slot {
   id: string
   label: string
   icon: IconKind
+  iconId?: string
   /** materiais: quantidade efetiva; demais: null */
   qty: number | null
   /** armaduras: 0-4; demais: null */
@@ -63,6 +68,7 @@ export function Inventory() {
   const [showAll, setShowAll] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [filled, setFilled] = useState<number | null>(null)
+  const [filledDragon, setFilledDragon] = useState(0)
   const hasSession = !!getSessionSave()
 
   const materials = useMemo(() => buildMaterials(data, manual, fromSave, materialQty), [data, manual, fromSave, materialQty])
@@ -81,6 +87,7 @@ export function Inventory() {
         id: m.id,
         label: m.label,
         icon: m.bucket as IconKind,
+        iconId: m.iconId,
         qty: m.qty,
         stars: null,
         owned: m.owned || (m.qty ?? 0) > 0,
@@ -94,6 +101,7 @@ export function Inventory() {
         id: k.id,
         label: k.label,
         icon: 'key' as IconKind,
+        iconId: k.iconId,
         qty: null,
         stars: null,
         owned: k.owned,
@@ -105,6 +113,7 @@ export function Inventory() {
         id: a.id,
         label: a.label,
         icon: 'armor' as IconKind,
+        iconId: a.iconId,
         qty: null,
         stars: a.stars,
         owned: a.owned,
@@ -116,6 +125,7 @@ export function Inventory() {
         id: f.id,
         label: f.label,
         icon: 'fabric' as IconKind,
+        iconId: f.iconId,
         qty: null,
         stars: null,
         owned: f.owned,
@@ -127,6 +137,7 @@ export function Inventory() {
         id: f.id,
         label: f.label,
         icon: 'fabric' as IconKind,
+        iconId: f.iconId,
         qty: null,
         stars: null,
         owned: f.owned,
@@ -134,10 +145,12 @@ export function Inventory() {
         locked: f.locked,
         kindKey: 'inventory.amiibo',
       })),
-      // as abas de equipamento renderizam <EquipmentTab/> e não usam esta lista
+      // as abas de equipamento/cavalos renderizam seu próprio componente e
+      // não usam esta lista
       bows: [],
       weapons: [],
       shields: [],
+      horses: [],
     }),
     [materials, keyItems, armor, fabrics, amiibo],
   )
@@ -152,7 +165,7 @@ export function Inventory() {
 
   const selected = slots.find((s) => s.id === selectedId) ?? slots[0] ?? null
 
-  const TABS: Tab[] = ['materials', 'key_items', 'armor', 'fabrics', 'fabrics_amiibo', 'bows', 'weapons', 'shields']
+  const TABS: Tab[] = ['materials', 'key_items', 'armor', 'fabrics', 'fabrics_amiibo', 'bows', 'weapons', 'shields', 'horses']
   const tabLabel = (tb: Tab): string => {
     if (tb === 'fabrics' || tb === 'fabrics_amiibo') {
       const key = `groups.${tb}`
@@ -199,7 +212,7 @@ export function Inventory() {
           >
             <TypeIcon kind={TAB_ICON[tb]} size={20} />
             <span className="max-w-16 truncate text-[10px]">{tabLabel(tb)}</span>
-            {!isEquipTab(tb) && (
+            {!isCustomTab(tb) && (
               <span className="font-mono text-[9px] text-ink-faint">
                 {ownedCount(tb)}/{slotsByTab[tb].length}
               </span>
@@ -209,8 +222,9 @@ export function Inventory() {
       </div>
 
       {isEquipTab(tab) && <EquipmentTab category={tab} hasSession={hasSession} />}
+      {tab === 'horses' && <HorsesTab hasSession={hasSession} />}
 
-      {!isEquipTab(tab) && (
+      {!isCustomTab(tab) && (
       <>
       <div className="mb-3 flex gap-2">
         <input
@@ -233,6 +247,7 @@ export function Inventory() {
               const { targets, rows } = armorUpgradeNeeds(data, manual, fromSave)
               setMaterialQtyBulk(targets)
               setFilled(rows.length)
+              setFilledDragon(rows.filter((r) => r.timeGated).length)
             }}
             className="panel shrink-0 px-3 py-2 text-xs text-ink-mute transition-colors hover:text-jade"
             title={t('inventory.fillUpgradeHint')}
@@ -245,6 +260,11 @@ export function Inventory() {
       {filled !== null && (
         <p className="mb-3 text-xs" style={{ color: 'var(--color-jade)' }}>
           {filled === 0 ? t('inventory.fillUpgradeNone') : t('inventory.fillUpgradeDone', { count: filled })}
+          {filled !== null && filledDragon > 0 && (
+            <span className="ml-1" style={{ color: 'var(--color-gold)' }}>
+              {t('inventory.fillUpgradeDragon', { count: filledDragon })}
+            </span>
+          )}
         </p>
       )}
 
@@ -271,7 +291,7 @@ export function Inventory() {
                   }}
                 >
                   <span style={{ color: s.owned || s.staged ? 'var(--color-ink)' : 'var(--color-ink-faint)' }}>
-                    <TypeIcon kind={s.icon} size={26} />
+                    <ItemIcon iconId={s.iconId} fallback={s.icon} size={26} />
                   </span>
                   {s.qty !== null && s.qty > 0 && (
                     <span
@@ -299,7 +319,7 @@ export function Inventory() {
           ) : (
             <>
               <div className="flex items-center justify-center py-2" style={{ color: 'var(--color-ink)' }}>
-                <TypeIcon kind={selected.icon} size={52} />
+                <ItemIcon iconId={selected.iconId} fallback={selected.icon} size={52} />
               </div>
               <div>
                 <h3 className="font-display text-base leading-tight">{selected.label}</h3>

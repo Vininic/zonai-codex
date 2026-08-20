@@ -10,7 +10,7 @@ import {
   type EquipCategory,
   type EquipPouch,
 } from '../lib/equipment'
-import { TypeIcon } from './TypeIcon'
+import { ItemIcon } from './ItemIcon'
 
 /**
  * Aba de equipamento do Inventário (arcos / armas / escudos).
@@ -79,7 +79,7 @@ export function EquipmentTab({ category, hasSession }: { category: EquipCategory
                   : undefined
               }
             >
-              <TypeIcon kind="armor" size={24} />
+              <ItemIcon iconId={s.id} fallback="armor" size={24} />
               <span className="absolute bottom-1 right-1.5 font-mono text-[9px] text-ink-mute">{s.durability}</span>
               {s.modifier !== 'None' && (
                 <span className="absolute left-1.5 top-1 font-mono text-[9px]" style={{ color: 'var(--color-jade)' }}>
@@ -97,7 +97,7 @@ export function EquipmentTab({ category, hasSession }: { category: EquipCategory
               className="panel relative flex aspect-square flex-col items-center justify-center gap-1 p-1.5"
               style={{ borderColor: 'var(--color-jade)', boxShadow: 'var(--glow-jade)' }}
             >
-              <TypeIcon kind="armor" size={24} />
+              <ItemIcon iconId={g.id} fallback="armor" size={24} />
               <span className="absolute bottom-1 right-1.5 font-mono text-[9px]" style={{ color: 'var(--color-jade)' }}>
                 {g.durability}
               </span>
@@ -140,7 +140,7 @@ export function EquipmentTab({ category, hasSession }: { category: EquipCategory
         ) : selected ? (
           <div className="space-y-2">
             <div className="flex items-center justify-center py-2">
-              <TypeIcon kind="armor" size={48} />
+              <ItemIcon iconId={selected.id} fallback="armor" size={48} />
             </div>
             <h3 className="font-display text-base leading-tight">{labelFor(selected.id)}</h3>
             <p className="font-mono text-[10px] text-ink-faint">{selected.id}</p>

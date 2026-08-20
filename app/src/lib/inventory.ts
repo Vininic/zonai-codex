@@ -14,6 +14,7 @@ export interface MaterialEntry {
   id: string
   label: string
   bucket: MaterialBucket
+  iconId?: string
   /** null = sem save na sessão (quantidade desconhecida); senão qtd efetiva (override se houver) */
   qty: number | null
   /** qtd real lida do save, antes de qualquer override do usuário */
@@ -29,6 +30,7 @@ export interface ToggleableEntry {
   id: string
   groupId: string
   label: string
+  iconId?: string
   owned: boolean
   /** marcado manualmente mas ainda não gravado no save */
   staged: boolean
@@ -39,6 +41,7 @@ export interface ToggleableEntry {
 export interface KeyItemEntry {
   id: string
   label: string
+  iconId?: string
   owned: boolean
   staged: boolean
   locked: boolean
@@ -47,6 +50,7 @@ export interface KeyItemEntry {
 export interface ArmorEntry {
   id: string
   label: string
+  iconId?: string
   owned: boolean
   /** null = sem save na sessão (nível desconhecido) */
   stars: number | null
@@ -98,6 +102,7 @@ export function buildMaterials(
       id: item.id,
       label: item.label ?? item.id,
       bucket: classifyMaterial(item.actorName, item.label ?? item.id),
+      iconId: item.actorName,
       qty: override ?? rawQty,
       rawQty,
       owned: !!(m[item.id] || s[item.id]),
@@ -114,11 +119,26 @@ export function buildMaterials(
  * `materialItemId -> quantidade alvo` pronto pro editor — é o atalho pro grind
  * mais chato do jogo (pedaço de dragão, fragmento de estrela, gema).
  */
+/**
+ * pedaços de dragão (Dinraal/Naydra/Farosh/Dragão da Luz — chifre, escama,
+ * garra/presa) só reaparecem numa janela de respawn ligada à lua sangrenta,
+ * bem mais rara que o grind normal de mineração/coleta — por isso entram
+ * marcados à parte (`timeGated`) em vez de virarem só mais uma linha da
+ * lista, e sobem pro topo mesmo quando a quantidade que falta é pequena.
+ */
+const TIME_GATED_ACTORS = new Set([
+  'Item_Enemy_211', 'Item_Enemy_212', 'Item_Enemy_213', 'Item_Enemy_214', // horns
+  'Item_Enemy_228', 'Item_Enemy_229', 'Item_Enemy_230', 'Item_Enemy_231', // spike shards
+  'Item_Enemy_38', 'Item_Enemy_49', 'Item_Enemy_53', 'Item_Enemy_158', // scales
+  'Item_Enemy_39', 'Item_Enemy_50', 'Item_Enemy_54', 'Item_Enemy_159', // claws/talon
+  'Item_Enemy_47', 'Item_Enemy_51', 'Item_Enemy_55', 'Item_Enemy_160', // fang shards
+])
+
 export function armorUpgradeNeeds(
   data: CompletionData,
   manual: Progress,
   fromSave: Progress,
-): { targets: Record<string, number>; rows: { label: string; have: number; need: number; missing: number }[] } {
+): { targets: Record<string, number>; rows: { label: string; have: number; need: number; missing: number; timeGated: boolean }[] } {
   const upgraded = data.stats.find((s) => s.id === 'armor_upgraded') as
     | (Stat & { upgradeMaterials?: { materialStockArrayHash: string; armor: { label: string; levels: Record<string, { material: string; quantity: number }[]> }[] } })
     | undefined
@@ -145,16 +165,16 @@ export function armorUpgradeNeeds(
   const byLabel = new Map(materials.map((m) => [m.label, m]))
 
   const targets: Record<string, number> = {}
-  const rows: { label: string; have: number; need: number; missing: number }[] = []
+  const rows: { label: string; have: number; need: number; missing: number; timeGated: boolean }[] = []
   for (const [label, total] of need) {
     const mat = byLabel.get(label)
     if (!mat) continue
     const have = mat.rawQty ?? 0
     if (have >= total) continue
     targets[mat.id] = Math.min(999, total)
-    rows.push({ label, have, need: total, missing: total - have })
+    rows.push({ label, have, need: total, missing: total - have, timeGated: TIME_GATED_ACTORS.has(mat.iconId ?? '') })
   }
-  rows.sort((a, b) => b.missing - a.missing)
+  rows.sort((a, b) => (a.timeGated === b.timeGated ? b.missing - a.missing : a.timeGated ? -1 : 1))
   return { targets, rows }
 }
 
@@ -168,6 +188,7 @@ export function buildToggleable(data: CompletionData, manual: Progress, fromSave
     id: item.id,
     groupId,
     label: item.label ?? item.id,
+    iconId: (item as StatItem & { fabricId?: string }).fabricId,
     owned: !!(m[item.id] || s[item.id]),
     staged: !!m[item.id] && !s[item.id],
     locked: !!s[item.id],
@@ -182,6 +203,7 @@ export function buildKeyItems(data: CompletionData, manual: Progress, fromSave: 
   return stat.items.map((item) => ({
     id: item.id,
     label: item.label ?? item.id,
+    iconId: item.actorName,
     owned: !!(m[item.id] || s[item.id]),
     staged: !!m[item.id] && !s[item.id],
     locked: !!s[item.id],
@@ -217,6 +239,7 @@ export function buildArmor(data: CompletionData, manual: Progress, fromSave: Pro
     return {
       id: item.id,
       label: item.label ?? item.id,
+      iconId: item.baseId,
       owned,
       stars: ownedInSave ? stars : null,
       staged: !!m[item.id] && !ownedInSave,

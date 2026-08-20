@@ -3,6 +3,7 @@ import { murmur3 } from './murmur3'
 import type { CompletionData, Category, Stat, StatItem } from './dataset'
 import type { EquipmentGrant, PlayerEdits as PlayerEditsType, Progress } from '../store/appStore'
 import { equipArrays, modifierHash } from './equipment'
+import { buildEponaGrant, horseFieldHash } from './horse'
 
 /**
  * Editor v1 (§3.5 do plano): grava flags escalares no buffer clonado.
@@ -83,8 +84,14 @@ export interface ArrayWrite {
   stockPtr?: number
   stockValue?: number
   /** arrays u32 paralelos indexados pelo mesmo slot (durabilidade, modificador
-   *  e valor do modificador, no caso de equipamento) */
+   *  e valor do modificador, no caso de equipamento; stats/cor, no de cavalo) */
   ints?: { ptr: number; value: number }[]
+  /** WString16Array (32 bytes/entrada, UTF-16) — nome de cavalo */
+  wstrings?: { ptr: number; value: string }[]
+  /** campo float de 32 bits (laço do cavalo) */
+  floats?: { ptr: number; value: number }[]
+  /** BoolArray: 1 bit por entrada, não 4 bytes (familiaridade conferida) */
+  bits?: { ptr: number; value: boolean }[]
 }
 
 export interface EditPlan {
@@ -204,6 +211,7 @@ export function buildEditPlan(
   values: Map<number, number> | null = null,
   materialQtyEdits: MaterialQtyEdit[] = [],
   equipmentGrants: EquipmentGrant[] = [],
+  grantEpona = false,
 ): EditPlan {
   const writes = new Map<number, number>()
   const arrayWrites: ArrayWrite[] = []
@@ -302,6 +310,42 @@ export function buildEditPlan(
     }
   }
 
+  // Epona: exclusiva de amiibo, sem forma normal de obter no jogo — grava
+  // num slot livre de OwnedHorseList com os valores padrão do amiibo real
+  // (mane/saddle/reins/stats/cor), igual Horse.DEFAULT_VALUES.GameRomHorseEpona
+  // no editor de referência.
+  if (buffer && values && grantEpona) {
+    const namesPtr = values.get(horseFieldHash('ActorName'))
+    if (namesPtr !== undefined) {
+      const names = readString64Raw(buffer, namesPtr)
+      const alreadyHas = names.includes('GameRomHorseEpona')
+      const idx = alreadyHas ? -1 : findEmptySlot(names, claimed)
+      if (idx !== -1) {
+        claimed.add(idx)
+        const grant = buildEponaGrant(idx)
+        const ints = Object.entries(grant.ints)
+          .map(([field, value]) => {
+            const ptr = values.get(horseFieldHash(field))
+            return ptr === undefined ? null : { ptr, value }
+          })
+          .filter((x): x is { ptr: number; value: number } => x !== null)
+        const wnamePtr = values.get(horseFieldHash('Name'))
+        const bondPtr = values.get(horseFieldHash('Familiarity'))
+        const bondCheckedPtr = values.get(horseFieldHash('IsFamiliarityChecked'))
+        arrayWrites.push({
+          namesPtr,
+          index: idx,
+          actorName: 'GameRomHorseEpona',
+          ints,
+          wstrings: wnamePtr !== undefined ? [{ ptr: wnamePtr, value: grant.name }] : [],
+          floats: bondPtr !== undefined ? [{ ptr: bondPtr, value: grant.bond }] : [],
+          bits: bondCheckedPtr !== undefined ? [{ ptr: bondCheckedPtr, value: grant.bondChecked }] : [],
+        })
+        itemCount++
+      }
+    }
+  }
+
   const p = currentPlayer
   if (playerEdits.rupees !== undefined && playerEdits.rupees !== p?.rupees)
     writes.set(H_RUPEES, Math.max(0, Math.min(999999, Math.round(playerEdits.rupees))))
@@ -338,6 +382,21 @@ export function applyEdits(original: ArrayBuffer, plan: EditPlan): { buffer: Arr
     }
     for (const { ptr, value } of aw.ints ?? []) {
       dv.setUint32(ptr + 4 + aw.index * 4, value >>> 0, true)
+    }
+    for (const { ptr, value } of aw.wstrings ?? []) {
+      const start = ptr + 4 + aw.index * 0x20
+      const wbytes = new Uint8Array(buffer, start, 0x20)
+      wbytes.fill(0)
+      for (let i = 0; i < Math.min(value.length, 9); i++) dv.setUint16(start + i * 2, value.charCodeAt(i), true)
+    }
+    for (const { ptr, value } of aw.floats ?? []) {
+      dv.setFloat32(ptr + 4 + aw.index * 4, value, true)
+    }
+    for (const { ptr, value } of aw.bits ?? []) {
+      const byteOff = ptr + 4 + Math.floor(aw.index / 8)
+      const bit = 1 << (aw.index % 8)
+      const cur = dv.getUint8(byteOff)
+      dv.setUint8(byteOff, value ? (cur | bit) : (cur & ~bit) & 0xff)
     }
     applied++
   }

@@ -1,6 +1,6 @@
 import type { MaterialBucket } from '../lib/materialIcon'
 
-export type IconKind = MaterialBucket | 'key' | 'fabric' | 'armor'
+export type IconKind = MaterialBucket | 'key' | 'fabric' | 'armor' | 'horse'
 
 const common = {
   stroke: 'currentColor',
@@ -103,6 +103,15 @@ export function TypeIcon({ kind, size = 22 }: { kind: IconKind; size?: number })
         <svg {...props}>
           <path d="M12 3c2.5 1.6 4.8 2.2 7 2.2 0 8.5-3.3 13-7 15.3-3.7-2.3-7-6.8-7-15.3 2.2 0 4.5-.6 7-2.2Z" />
           <path d="M12 8v8" />
+        </svg>
+      )
+    case 'horse':
+      return (
+        <svg {...props}>
+          <path d="M6 20v-5.5c0-1 .3-2 .9-2.8L5 9.5 7 8l2 1.8c.7-.5 1.6-.8 2.5-.8h1c2.8 0 5 2.2 5 5V20" />
+          <path d="M17.5 9c1 0 1.5.6 1.5 1.5S18.5 12 17.5 12" />
+          <circle cx="12.3" cy="6.3" r=".6" fill="currentColor" stroke="none" />
+          <path d="M9 20v-3M14 20v-3" />
         </svg>
       )
     case 'misc':

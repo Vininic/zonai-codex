@@ -5,7 +5,7 @@ import { useDataset } from '../lib/useDataset'
 import { planRoute, progressBrief } from '../lib/planner'
 import { purahChatText } from '../lib/purah'
 import { activeAiConfig, HOSTED_AI_AVAILABLE } from '../lib/ai'
-import { parseIntentLocal, parseIntentLLM, type Intent } from '../lib/intent'
+import { parseIntentLocal, parseIntentLLM, CHECKLIST_STAT_IDS, type Intent } from '../lib/intent'
 import { allArmorLabels, buildArmorPlan, type ArmorPlan } from '../lib/armorPlanner'
 import { buildRegionPlan, type RegionPlan } from '../lib/regionPlanner'
 import { REGIONS, regionById } from '../lib/regions'
@@ -35,7 +35,18 @@ interface RegionPlanMsg {
   type: 'region'
   plan: RegionPlan
 }
-type Plan = CollectPlan | ArmorPlanMsg | SummaryPlan | RegionPlanMsg
+/**
+ * Grupos sem coordenada (tecidos, quests, receitas…): não há rota a traçar,
+ * então a resposta honesta é a lista do que falta + de onde vem cada um.
+ */
+interface ChecklistPlan {
+  type: 'checklist'
+  statId: string
+  pending: { label: string; hint?: string }[]
+  pendingTotal: number
+  total: number
+}
+type Plan = CollectPlan | ArmorPlanMsg | SummaryPlan | RegionPlanMsg | ChecklistPlan
 
 interface Msg {
   role: 'user' | 'purah'
@@ -148,6 +159,30 @@ export function Companion() {
     return { type: 'summary', rows }
   }
 
+  /**
+   * O que ainda falta num grupo sem mapa. `hint` sai do próprio dataset:
+   * tecidos trazem `source` (o jeito exato de obter), receitas trazem os
+   * ingredientes. Onde não há metadado, fica só o nome — melhor admitir isso
+   * do que inventar uma localização.
+   */
+  function buildChecklistPlan(statId: string): ChecklistPlan | null {
+    const stat = data.stats.find((st) => st.id === statId)
+    if (!stat) return null
+    const m = manual[statId] ?? {}
+    const sv = fromSave[statId] ?? {}
+    const hintOf = (item: Record<string, unknown>): string | undefined => {
+      const source = item.source as string | undefined
+      if (source && source !== 'Default') return source
+      const ingredients = item.recipeIngredients as string[] | undefined
+      if (ingredients?.length) return ingredients.join(' + ')
+      return undefined
+    }
+    const pending = stat.items
+      .filter((item) => !m[item.id] && !sv[item.id])
+      .map((item) => ({ label: item.label ?? item.id, hint: hintOf(item as unknown as Record<string, unknown>) }))
+    return { type: 'checklist', statId, pending: pending.slice(0, 40), pendingTotal: pending.length, total: stat.items.length }
+  }
+
   /** abre o painel de rota à direita do chat */
   function traceRoute(
     categoryIds: string[],
@@ -177,7 +212,7 @@ export function Companion() {
     let intent: Intent = parseIntentLocal(text, armorLabels)
     if (intent.kind === 'unknown' && cfg) {
       try {
-        intent = await parseIntentLLM(cfg, text, data.categories.map((c) => c.id), armorLabels, REGIONS.map((r) => r.id))
+        intent = await parseIntentLLM(cfg, text, data.categories.map((c) => c.id), armorLabels, REGIONS.map((r) => r.id), CHECKLIST_STAT_IDS)
       } catch {
         /* fica unknown */
       }
@@ -219,6 +254,16 @@ export function Companion() {
             ? t('companion.regionDone', { name: region.name })
             : t('companion.regionReply', { name: region.name, count: p.totalPending, steps: p.steps.length })
         narrationContext = `Region sweep of ${region.name}: ${p.totalPending} pending across ${p.steps.length} steps: ${p.steps.map((s) => `${s.categoryId} (${s.pendingTotal})`).join(', ')}`
+      }
+    } else if (intent.kind === 'checklist') {
+      const p = buildChecklistPlan(intent.statId)
+      if (p) {
+        plan = p
+        reply =
+          p.pendingTotal === 0
+            ? t('companion.allDone', { name: groupName(p.statId) })
+            : t('companion.checklistReply', { count: p.pendingTotal, name: groupName(p.statId) })
+        narrationContext = `Checklist for ${p.statId}: ${p.pendingTotal} of ${p.total} still missing. These have no map coordinates, so there is no route — only the list: ${p.pending.map((r) => `${r.label}${r.hint ? ` (${r.hint})` : ''}`).join('; ')}`
       }
     } else if (intent.kind === 'summary') {
       const p = buildSummaryPlan()
@@ -302,6 +347,7 @@ export function Companion() {
                   )}
                   {m.plan?.type === 'armor' && <ArmorPlanCard plan={m.plan.plan} groupName={groupName} />}
                   {m.plan?.type === 'summary' && <SummaryCard plan={m.plan} />}
+                  {m.plan?.type === 'checklist' && <ChecklistCard plan={m.plan} />}
                   {m.plan?.type === 'region' && (
                     <RegionPlanCard
                       plan={m.plan.plan}
@@ -631,6 +677,31 @@ function SummaryCard({ plan }: { plan: SummaryPlan }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function ChecklistCard({ plan }: { plan: ChecklistPlan }) {
+  const { t } = useTranslation()
+  const meta = categoryMeta(plan.statId)
+  const hidden = plan.pendingTotal - plan.pending.length
+  // grupo completo: a mensagem de texto já diz tudo, o cartão vazio só polui
+  if (plan.pending.length === 0) return null
+  return (
+    <div className="panel space-y-2 p-3">
+      <p className="text-[10px] uppercase tracking-widest text-ink-faint">{t('companion.checklistNoRoute')}</p>
+      <ul className="space-y-1">
+        {plan.pending.map((row) => (
+          <li key={row.label} className="flex items-baseline gap-2 text-xs">
+            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: meta.color }} />
+            <span className="min-w-0">
+              <span className="text-ink">{row.label}</span>
+              {row.hint && <span className="text-ink-faint"> — {row.hint}</span>}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {hidden > 0 && <p className="text-[11px] text-ink-faint">{t('companion.checklistMore', { count: hidden })}</p>}
     </div>
   )
 }

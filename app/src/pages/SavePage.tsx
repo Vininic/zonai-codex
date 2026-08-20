@@ -203,6 +203,8 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
   const setPlayerEdit = useAppStore((s) => s.setPlayerEdit)
   const equipmentGrants = useAppStore((s) => s.equipmentGrants)
   const removeEquipmentGrant = useAppStore((s) => s.removeEquipmentGrant)
+  const grantEpona = useAppStore((s) => s.grantEpona)
+  const setGrantEpona = useAppStore((s) => s.setGrantEpona)
 
   const session = getSessionSave()
   const parsedSession = useMemo(() => (session ? parseSave(session.buffer) : null), [session])
@@ -221,13 +223,13 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
 
   const plan = useMemo(
     () =>
-      buildEditPlan(data, staged, selected, edits, player, session?.buffer ?? null, parsedSession?.values ?? null, materialQtyEdits, equipmentGrants),
-    [data, staged, selected, edits, player, session, parsedSession, materialQtyEdits, equipmentGrants],
+      buildEditPlan(data, staged, selected, edits, player, session?.buffer ?? null, parsedSession?.values ?? null, materialQtyEdits, equipmentGrants, grantEpona),
+    [data, staged, selected, edits, player, session, parsedSession, materialQtyEdits, equipmentGrants, grantEpona],
   )
   const itemOnlyPlan = useMemo(
     () =>
-      buildEditPlan(data, staged, selected, {}, null, session?.buffer ?? null, parsedSession?.values ?? null, materialQtyEdits, equipmentGrants),
-    [data, staged, selected, session, parsedSession, materialQtyEdits, equipmentGrants],
+      buildEditPlan(data, staged, selected, {}, null, session?.buffer ?? null, parsedSession?.values ?? null, materialQtyEdits, equipmentGrants, grantEpona),
+    [data, staged, selected, session, parsedSession, materialQtyEdits, equipmentGrants, grantEpona],
   )
   const playerChanges = plan.writes.size - itemOnlyPlan.writes.size
 
@@ -347,7 +349,16 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
               ))}
             </div>
           )}
-          {writable.length === 0 && materialQtyEdits.length === 0 && equipmentGrants.length === 0 && (
+          {grantEpona && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="min-w-0 flex-1 truncate text-ink-mute">{t('save.eponaStaged')}</span>
+              <button onClick={() => setGrantEpona(false)} className="shrink-0 px-1 text-ink-faint hover:text-gloom" aria-label={t('common.close')}>
+                ✕
+              </button>
+            </div>
+          )}
+
+          {writable.length === 0 && materialQtyEdits.length === 0 && equipmentGrants.length === 0 && !grantEpona && (
             <p className="text-xs text-ink-faint">{t('save.noStaged')}</p>
           )}
 

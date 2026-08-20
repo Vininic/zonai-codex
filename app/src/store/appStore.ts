@@ -99,6 +99,7 @@ interface AppState {
   playerEdits: PlayerEdits
   /** equipamento a conceder em slots vazios do pouch, staged pro editor */
   equipmentGrants: EquipmentGrant[]
+  grantEpona: boolean
 
   setLang: (lang: 'en' | 'pt') => void
   setTheme: (theme: 'dark' | 'light') => void
@@ -122,6 +123,7 @@ interface AppState {
   clearPlayerEdits: () => void
   addEquipmentGrant: (grant: EquipmentGrant) => void
   removeEquipmentGrant: (index: number) => void
+  setGrantEpona: (v: boolean) => void
   /** restaura um backup JSON exportado */
   restore: (snapshot: Partial<Pick<AppState, 'manual' | 'fromSave' | 'player' | 'saveMeta' | 'excluded'>>) => void
 }
@@ -149,6 +151,7 @@ export const useAppStore = create<AppState>()(
       materialQty: {},
       playerEdits: {},
       equipmentGrants: [],
+      grantEpona: false,
 
       setLang: (lang) => set({ lang }),
       setTheme: (theme) => set({ theme }),
@@ -194,6 +197,7 @@ export const useAppStore = create<AppState>()(
       addEquipmentGrant: (grant) => set((s) => ({ equipmentGrants: [...s.equipmentGrants, grant] })),
       removeEquipmentGrant: (index) =>
         set((s) => ({ equipmentGrants: s.equipmentGrants.filter((_, i) => i !== index) })),
+      setGrantEpona: (v) => set({ grantEpona: v }),
       restore: (snapshot) => set(snapshot),
     }),
     { name: 'zonai-codex' },
