@@ -233,7 +233,7 @@ export function buildArmor(data: CompletionData, manual: Progress, fromSave: Pro
   const ptr = save.values.get(parseInt(stat.arrayHash, 16))
   const pouch = new Set(readString64Array(save.buffer, ptr))
 
-  return (stat.items as (StatItem & { levels?: { id: string; stars: number }[] })[]).map((item) => {
+  return (stat.items as (StatItem & { levels?: { id: string; stars: number }[]; baseId?: string })[]).map((item) => {
     const ownedInSave = (item.ids ?? []).some((id) => pouch.has(id))
     let stars = 0
     for (const lvl of item.levels ?? []) if (pouch.has(lvl.id)) stars = Math.max(stars, lvl.stars)
