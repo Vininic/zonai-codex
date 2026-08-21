@@ -122,9 +122,10 @@ export function buildMaterials(
 /**
  * pedaços de dragão (Dinraal/Naydra/Farosh/Dragão da Luz — chifre, escama,
  * garra/presa) só reaparecem numa janela de respawn ligada à lua sangrenta,
- * bem mais rara que o grind normal de mineração/coleta — por isso entram
- * marcados à parte (`timeGated`) em vez de virarem só mais uma linha da
- * lista, e sobem pro topo mesmo quando a quantidade que falta é pequena.
+ * bem mais rara que o grind normal de mineração/coleta. Fragmento de estrela
+ * entra junto: cai em horário/local aleatório à noite, não dá pra "ir buscar".
+ * Ambos entram marcados à parte (`timeGated`) em vez de virarem só mais uma
+ * linha da lista, e sobem pro topo mesmo quando falta pouco.
  */
 const TIME_GATED_ACTORS = new Set([
   'Item_Enemy_211', 'Item_Enemy_212', 'Item_Enemy_213', 'Item_Enemy_214', // horns
@@ -132,6 +133,7 @@ const TIME_GATED_ACTORS = new Set([
   'Item_Enemy_38', 'Item_Enemy_49', 'Item_Enemy_53', 'Item_Enemy_158', // scales
   'Item_Enemy_39', 'Item_Enemy_50', 'Item_Enemy_54', 'Item_Enemy_159', // claws/talon
   'Item_Enemy_47', 'Item_Enemy_51', 'Item_Enemy_55', 'Item_Enemy_160', // fang shards
+  'Item_Ore_J', // fragmento de estrela
 ])
 
 export function armorUpgradeNeeds(
