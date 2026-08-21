@@ -205,6 +205,13 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
   const removeEquipmentGrant = useAppStore((s) => s.removeEquipmentGrant)
   const grantEpona = useAppStore((s) => s.grantEpona)
   const setGrantEpona = useAppStore((s) => s.setGrantEpona)
+  const equipmentEdits = useAppStore((s) => s.equipmentEdits)
+  const equipmentDeletes = useAppStore((s) => s.equipmentDeletes)
+  const horseEdits = useAppStore((s) => s.horseEdits)
+  const horseDeletes = useAppStore((s) => s.horseDeletes)
+  const clearPouchEdits = useAppStore((s) => s.clearPouchEdits)
+  const pouchEditCount =
+    Object.keys(equipmentEdits).length + equipmentDeletes.length + Object.keys(horseEdits).length + horseDeletes.length
 
   const session = getSessionSave()
   const parsedSession = useMemo(() => (session ? parseSave(session.buffer) : null), [session])
@@ -223,13 +230,13 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
 
   const plan = useMemo(
     () =>
-      buildEditPlan(data, staged, selected, edits, player, session?.buffer ?? null, parsedSession?.values ?? null, materialQtyEdits, equipmentGrants, grantEpona),
-    [data, staged, selected, edits, player, session, parsedSession, materialQtyEdits, equipmentGrants, grantEpona],
+      buildEditPlan(data, staged, selected, edits, player, session?.buffer ?? null, parsedSession?.values ?? null, materialQtyEdits, equipmentGrants, grantEpona, equipmentEdits, equipmentDeletes, horseEdits, horseDeletes),
+    [data, staged, selected, edits, player, session, parsedSession, materialQtyEdits, equipmentGrants, grantEpona, equipmentEdits, equipmentDeletes, horseEdits, horseDeletes],
   )
   const itemOnlyPlan = useMemo(
     () =>
-      buildEditPlan(data, staged, selected, {}, null, session?.buffer ?? null, parsedSession?.values ?? null, materialQtyEdits, equipmentGrants, grantEpona),
-    [data, staged, selected, session, parsedSession, materialQtyEdits, equipmentGrants, grantEpona],
+      buildEditPlan(data, staged, selected, {}, null, session?.buffer ?? null, parsedSession?.values ?? null, materialQtyEdits, equipmentGrants, grantEpona, equipmentEdits, equipmentDeletes, horseEdits, horseDeletes),
+    [data, staged, selected, session, parsedSession, materialQtyEdits, equipmentGrants, grantEpona, equipmentEdits, equipmentDeletes, horseEdits, horseDeletes],
   )
   const playerChanges = plan.writes.size - itemOnlyPlan.writes.size
 
@@ -358,7 +365,18 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
             </div>
           )}
 
-          {writable.length === 0 && materialQtyEdits.length === 0 && equipmentGrants.length === 0 && !grantEpona && (
+          {pouchEditCount > 0 && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="min-w-0 flex-1 truncate text-ink-mute">
+                {t('save.pouchEditsStaged', { count: pouchEditCount })}
+              </span>
+              <button onClick={clearPouchEdits} className="shrink-0 px-1 text-ink-faint hover:text-gloom" aria-label={t('common.close')}>
+                ✕
+              </button>
+            </div>
+          )}
+
+          {writable.length === 0 && materialQtyEdits.length === 0 && equipmentGrants.length === 0 && !grantEpona && pouchEditCount === 0 && (
             <p className="text-xs text-ink-faint">{t('save.noStaged')}</p>
           )}
 

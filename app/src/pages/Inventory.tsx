@@ -268,7 +268,7 @@ export function Inventory() {
         </p>
       )}
 
-      <div className="grid gap-3 lg:grid-cols-[1fr_18rem]">
+      <div className="grid gap-3 lg:grid-cols-[1fr_24rem]">
         {/* grade de slots */}
         {slots.length === 0 ? (
           <p className="panel px-3 py-8 text-center text-sm text-ink-mute">
@@ -319,7 +319,7 @@ export function Inventory() {
           ) : (
             <>
               <div className="flex items-center justify-center py-2" style={{ color: 'var(--color-ink)' }}>
-                <ItemIcon iconId={selected.iconId} fallback={selected.icon} size={52} />
+                <ItemIcon iconId={selected.iconId} fallback={selected.icon} size={72} />
               </div>
               <div>
                 <h3 className="font-display text-base leading-tight">{selected.label}</h3>

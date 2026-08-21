@@ -1,9 +1,10 @@
 import { CLEAR_HASH, META_SAVE_TYPE, type PlayerStats } from './saveParser'
 import { murmur3 } from './murmur3'
 import type { CompletionData, Category, Stat, StatItem } from './dataset'
-import type { EquipmentGrant, PlayerEdits as PlayerEditsType, Progress } from '../store/appStore'
+import type { EquipmentEdit, EquipmentGrant, HorseEdit, PlayerEdits as PlayerEditsType, Progress } from '../store/appStore'
 import { equipArrays, modifierHash } from './equipment'
 import { buildEponaGrant, horseFieldHash } from './horse'
+import { murmur3 as hashName } from './murmur3'
 
 /**
  * Editor v1 (§3.5 do plano): grava flags escalares no buffer clonado.
@@ -212,6 +213,10 @@ export function buildEditPlan(
   materialQtyEdits: MaterialQtyEdit[] = [],
   equipmentGrants: EquipmentGrant[] = [],
   grantEpona = false,
+  equipmentEdits: Record<string, EquipmentEdit> = {},
+  equipmentDeletes: string[] = [],
+  horseEdits: Record<number, HorseEdit> = {},
+  horseDeletes: number[] = [],
 ): EditPlan {
   const writes = new Map<number, number>()
   const arrayWrites: ArrayWrite[] = []
@@ -307,6 +312,123 @@ export function buildEditPlan(
         ],
       })
       itemCount++
+    }
+  }
+
+  // equipamento existente: alterar durabilidade/modificador de um slot ocupado,
+  // ou esvaziá-lo. Escrever no MESMO índice não move nenhum outro byte —
+  // mesma garantia dos grants (ver comentário no topo).
+  if (buffer && values) {
+    const parseKey = (key: string) => {
+      const [cat, idxText] = key.split(':')
+      const index = parseInt(idxText, 10)
+      if (!['bows', 'weapons', 'shields'].includes(cat) || Number.isNaN(index)) return null
+      return { cat: cat as EquipmentGrant['category'], index }
+    }
+
+    for (const [key, patch] of Object.entries(equipmentEdits)) {
+      if (equipmentDeletes.includes(key)) continue // apagar vence editar
+      const parsed = parseKey(key)
+      if (!parsed) continue
+      const arrays = equipArrays(values, parsed.cat, buffer)
+      if (!arrays) continue
+      const names = readString64Raw(buffer, arrays.namePtr)
+      const actorName = names[parsed.index]
+      if (!actorName) continue // slot já vazio: nada a editar
+      const ints: { ptr: number; value: number }[] = []
+      if (patch.durability !== undefined) ints.push({ ptr: arrays.lifePtr, value: Math.max(1, Math.round(patch.durability)) })
+      if (patch.modifier !== undefined) {
+        ints.push({ ptr: arrays.effectTypePtr, value: modifierHash(patch.modifier) })
+        if (patch.modifier === 'None') ints.push({ ptr: arrays.effectValuePtr, value: 0 })
+      }
+      if (patch.modifierValue !== undefined && patch.modifier !== 'None')
+        ints.push({ ptr: arrays.effectValuePtr, value: Math.max(0, Math.round(patch.modifierValue)) })
+      if (!ints.length) continue
+      arrayWrites.push({ namesPtr: arrays.namePtr, index: parsed.index, actorName, ints })
+      itemCount++
+    }
+
+    for (const key of equipmentDeletes) {
+      const parsed = parseKey(key)
+      if (!parsed) continue
+      const arrays = equipArrays(values, parsed.cat, buffer)
+      if (!arrays) continue
+      const names = readString64Raw(buffer, arrays.namePtr)
+      if (!names[parsed.index]) continue
+      // nome vazio = slot livre; zera os paralelos pra não deixar lixo
+      arrayWrites.push({
+        namesPtr: arrays.namePtr,
+        index: parsed.index,
+        actorName: '',
+        ints: [
+          { ptr: arrays.lifePtr, value: 0 },
+          { ptr: arrays.effectTypePtr, value: 0 },
+          { ptr: arrays.effectValuePtr, value: 0 },
+        ],
+      })
+      itemCount++
+    }
+
+    // cavalos existentes: mesma ideia, com os tipos extras do OwnedHorseList
+    const horseNamesPtr = values.get(horseFieldHash('ActorName'))
+    if (horseNamesPtr !== undefined) {
+      const horseNames = readString64Raw(buffer, horseNamesPtr)
+      const ptrOf = (field: string) => values.get(horseFieldHash(field))
+
+      for (const [idxText, patch] of Object.entries(horseEdits)) {
+        const index = parseInt(idxText, 10)
+        if (horseDeletes.includes(index)) continue
+        const actorName = horseNames[index]
+        if (!actorName) continue
+        const ints: { ptr: number; value: number }[] = []
+        const pushInt = (field: string, value?: number) => {
+          const ptr = ptrOf(field)
+          if (ptr !== undefined && value !== undefined) ints.push({ ptr, value })
+        }
+        const pushEnum = (field: string, name?: string) => {
+          const ptr = ptrOf(field)
+          if (ptr !== undefined && name !== undefined) ints.push({ ptr, value: hashName(name) })
+        }
+        pushInt('Toughness', patch.statsStrength)
+        pushInt('Speed', patch.statsSpeed)
+        pushInt('ChargeNum', patch.statsStamina)
+        pushInt('HorsePower', patch.statsPull)
+        pushEnum('Mane', patch.mane)
+        pushEnum('Saddle', patch.saddle)
+        pushEnum('Rein', patch.rein)
+
+        const bondPtr = ptrOf('Familiarity')
+        const wnamePtr = ptrOf('Name')
+        const write: ArrayWrite = { namesPtr: horseNamesPtr, index, actorName, ints }
+        if (patch.name !== undefined && wnamePtr !== undefined) write.wstrings = [{ ptr: wnamePtr, value: patch.name }]
+        if (patch.bond !== undefined && bondPtr !== undefined)
+          write.floats = [{ ptr: bondPtr, value: Math.max(0, Math.min(1, patch.bond)) }]
+        if (!ints.length && !write.wstrings && !write.floats) continue
+        arrayWrites.push(write)
+        itemCount++
+      }
+
+      for (const index of horseDeletes) {
+        if (!horseNames[index]) continue
+        const ints: { ptr: number; value: number }[] = []
+        for (const field of ['Toughness', 'Speed', 'ChargeNum', 'HorsePower', 'HorseType', 'ColorType', 'FootType', 'Mane', 'Saddle', 'Rein']) {
+          const ptr = ptrOf(field)
+          if (ptr !== undefined) ints.push({ ptr, value: 0 })
+        }
+        const bondPtr = ptrOf('Familiarity')
+        const wnamePtr = ptrOf('Name')
+        const bondCheckedPtr = ptrOf('IsFamiliarityChecked')
+        arrayWrites.push({
+          namesPtr: horseNamesPtr,
+          index,
+          actorName: '',
+          ints,
+          wstrings: wnamePtr !== undefined ? [{ ptr: wnamePtr, value: '' }] : [],
+          floats: bondPtr !== undefined ? [{ ptr: bondPtr, value: 0 }] : [],
+          bits: bondCheckedPtr !== undefined ? [{ ptr: bondCheckedPtr, value: false }] : [],
+        })
+        itemCount++
+      }
     }
   }
 

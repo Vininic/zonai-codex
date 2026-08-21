@@ -218,9 +218,11 @@ export function buildArmor(data: CompletionData, manual: Progress, fromSave: Pro
   const m = manual.armor_inventory ?? {}
   const s = fromSave.armor_inventory ?? {}
   const fallback = () =>
-    stat.items.map((item) => ({
+    (stat.items as (StatItem & { baseId?: string })[]).map((item) => ({
       id: item.id,
       label: item.label ?? item.id,
+      // sem save o ícone real continua valendo — só as estrelas é que dependem do arquivo
+      iconId: item.baseId,
       owned: !!(m[item.id] || s[item.id]),
       stars: null,
       staged: !!m[item.id] && !s[item.id],

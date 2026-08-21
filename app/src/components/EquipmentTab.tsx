@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store/appStore'
+import type { EquipmentEdit } from '../store/appStore'
 import {
   MODIFIERS,
   loadEquipmentCatalog,
@@ -9,6 +10,7 @@ import {
   type EquipCatalog,
   type EquipCategory,
   type EquipPouch,
+  type EquipSlot,
 } from '../lib/equipment'
 import { ItemIcon } from './ItemIcon'
 
@@ -24,6 +26,11 @@ export function EquipmentTab({ category, hasSession }: { category: EquipCategory
   const grants = useAppStore((s) => s.equipmentGrants)
   const addGrant = useAppStore((s) => s.addEquipmentGrant)
   const removeGrant = useAppStore((s) => s.removeEquipmentGrant)
+  const equipmentEdits = useAppStore((s) => s.equipmentEdits)
+  const setEquipmentEdit = useAppStore((s) => s.setEquipmentEdit)
+  const clearEquipmentEdit = useAppStore((s) => s.clearEquipmentEdit)
+  const equipmentDeletes = useAppStore((s) => s.equipmentDeletes)
+  const toggleEquipmentDelete = useAppStore((s) => s.toggleEquipmentDelete)
 
   const [catalog, setCatalog] = useState<EquipCatalog | null>(null)
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
@@ -57,37 +64,49 @@ export function EquipmentTab({ category, hasSession }: { category: EquipCategory
   const freeAfterGrants = pouch.freeIndices.length - catGrants.length
 
   return (
-    <div className="grid gap-3 lg:grid-cols-[1fr_18rem]">
+    <div className="grid gap-3 lg:grid-cols-[1fr_24rem]">
       <div className="space-y-2">
         <p className="text-xs text-ink-faint">
           {t('inventory.equipCapacity', { used: pouch.slots.length, total: pouch.capacity, free: freeAfterGrants })}
         </p>
 
         <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-6 xl:grid-cols-8">
-          {pouch.slots.map((s, i) => (
-            <button
-              key={`${s.index}-${s.id}`}
-              onClick={() => {
-                setSelectedIdx(i)
-                setAdding(false)
-              }}
-              title={labelFor(s.id)}
-              className="panel relative flex aspect-square flex-col items-center justify-center gap-1 p-1.5 transition-transform hover:scale-[1.04]"
-              style={
-                selectedIdx === i
-                  ? { borderColor: 'var(--color-gold)', boxShadow: 'var(--glow-gold)' }
-                  : undefined
-              }
-            >
-              <ItemIcon iconId={s.id} fallback="armor" size={24} />
-              <span className="absolute bottom-1 right-1.5 font-mono text-[9px] text-ink-mute">{s.durability}</span>
-              {s.modifier !== 'None' && (
-                <span className="absolute left-1.5 top-1 font-mono text-[9px]" style={{ color: 'var(--color-jade)' }}>
-                  ★
+          {pouch.slots.map((s, i) => {
+            const key = `${category}:${s.index}`
+            const edited = !!equipmentEdits[key]
+            const deleted = equipmentDeletes.includes(key)
+            return (
+              <button
+                key={`${s.index}-${s.id}`}
+                onClick={() => {
+                  setSelectedIdx(i)
+                  setAdding(false)
+                }}
+                title={labelFor(s.id)}
+                className="panel relative flex aspect-square flex-col items-center justify-center gap-1 p-1.5 transition-transform hover:scale-[1.04]"
+                style={
+                  selectedIdx === i
+                    ? { borderColor: 'var(--color-gold)', boxShadow: 'var(--glow-gold)' }
+                    : deleted
+                      ? { borderColor: 'var(--color-gloom)', opacity: 0.45 }
+                      : edited
+                        ? { borderColor: 'var(--color-jade)' }
+                        : undefined
+                }
+              >
+                <ItemIcon iconId={s.id} fallback="armor" size={24} />
+                <span className="absolute bottom-1 right-1.5 font-mono text-[9px] text-ink-mute">
+                  {equipmentEdits[key]?.durability ?? s.durability}
                 </span>
-              )}
-            </button>
-          ))}
+                {deleted && <span className="absolute inset-0 flex items-center justify-center text-lg text-gloom">✕</span>}
+                {!deleted && (edited || s.modifier !== 'None') && (
+                  <span className="absolute left-1.5 top-1 font-mono text-[9px]" style={{ color: 'var(--color-jade)' }}>
+                    ★
+                  </span>
+                )}
+              </button>
+            )
+          })}
 
           {/* itens staged, ainda não gravados */}
           {catGrants.map((g) => (
@@ -138,21 +157,17 @@ export function EquipmentTab({ category, hasSession }: { category: EquipCategory
             }}
           />
         ) : selected ? (
-          <div className="space-y-2">
-            <div className="flex items-center justify-center py-2">
-              <ItemIcon iconId={selected.id} fallback="armor" size={48} />
-            </div>
-            <h3 className="font-display text-base leading-tight">{labelFor(selected.id)}</h3>
-            <p className="font-mono text-[10px] text-ink-faint">{selected.id}</p>
-            <dl className="space-y-1 text-[11px]">
-              <Row label={t('inventory.durability')} value={String(selected.durability)} />
-              <Row label={t('inventory.modifier')} value={selected.modifier} />
-              {selected.modifier !== 'None' && (
-                <Row label={t('inventory.modifierValue')} value={String(selected.modifierValue)} />
-              )}
-            </dl>
-            <p className="text-[10px] leading-relaxed text-ink-faint">{t('inventory.equipReadOnly')}</p>
-          </div>
+          <SlotEditor
+            key={`${category}:${selected.index}`}
+            category={category}
+            slot={selected}
+            label={labelFor(selected.id)}
+            edit={equipmentEdits[`${category}:${selected.index}`]}
+            deleted={equipmentDeletes.includes(`${category}:${selected.index}`)}
+            onEdit={(patch) => setEquipmentEdit(`${category}:${selected.index}`, patch)}
+            onReset={() => clearEquipmentEdit(`${category}:${selected.index}`)}
+            onToggleDelete={() => toggleEquipmentDelete(`${category}:${selected.index}`)}
+          />
         ) : (
           <div className="space-y-2">
             <p className="text-xs text-ink-faint">{t('inventory.selectHint')}</p>
@@ -168,11 +183,118 @@ export function EquipmentTab({ category, hasSession }: { category: EquipCategory
   )
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+/**
+ * Editor de um slot que já existe no save. As mudanças ficam staged no store
+ * (como todo o resto do editor) e só tocam o arquivo no "Gravar e baixar" —
+ * por isso "Reverter" é sempre possível: o save original nunca foi alterado.
+ */
+function SlotEditor({
+  category,
+  slot,
+  label,
+  edit,
+  deleted,
+  onEdit,
+  onReset,
+  onToggleDelete,
+}: {
+  category: EquipCategory
+  slot: EquipSlot
+  label: string
+  edit?: EquipmentEdit
+  deleted: boolean
+  onEdit: (patch: EquipmentEdit) => void
+  onReset: () => void
+  onToggleDelete: () => void
+}) {
+  const { t } = useTranslation()
+  const durability = edit?.durability ?? slot.durability
+  const modifier = edit?.modifier ?? slot.modifier
+  const modifierValue = edit?.modifierValue ?? slot.modifierValue
+  const dirty = !!edit
+  const field = 'panel mt-1 w-full bg-stone-2 px-2 py-1.5 text-sm text-ink focus:outline-none'
+  // um modificador vindo do save pode não estar na lista (hash desconhecido);
+  // incluí-lo evita que abrir o editor troque silenciosamente o valor
+  const options = MODIFIERS[category].includes(modifier) ? MODIFIERS[category] : [modifier, ...MODIFIERS[category]]
+
   return (
-    <div className="flex justify-between gap-2">
-      <dt className="text-ink-faint">{label}</dt>
-      <dd className="font-mono">{value}</dd>
+    <div className="space-y-3" style={deleted ? { opacity: 0.5 } : undefined}>
+      <div className="flex items-center justify-center py-2">
+        <ItemIcon iconId={slot.id} fallback="armor" size={72} />
+      </div>
+      <div>
+        <h3 className="font-display text-base leading-tight">{label}</h3>
+        <p className="font-mono text-[10px] text-ink-faint">{slot.id}</p>
+      </div>
+
+      <label className="block text-[10px] uppercase tracking-widest text-ink-mute">
+        {t('inventory.durability')}
+        <input
+          type="number"
+          min={1}
+          max={9999}
+          disabled={deleted}
+          value={durability}
+          onChange={(e) => onEdit({ durability: Number(e.target.value) })}
+          className={`${field} font-mono`}
+          style={edit?.durability !== undefined ? { borderColor: 'var(--color-jade)' } : undefined}
+        />
+      </label>
+
+      <label className="block text-[10px] uppercase tracking-widest text-ink-mute">
+        {t('inventory.modifier')}
+        <select
+          value={modifier}
+          disabled={deleted}
+          onChange={(e) => onEdit({ modifier: e.target.value })}
+          className={field}
+          style={edit?.modifier !== undefined ? { borderColor: 'var(--color-jade)' } : undefined}
+        >
+          {options.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {modifier !== 'None' && (
+        <label className="block text-[10px] uppercase tracking-widest text-ink-mute">
+          {t('inventory.modifierValue')}
+          <input
+            type="number"
+            min={0}
+            max={999}
+            disabled={deleted}
+            value={modifierValue}
+            onChange={(e) => onEdit({ modifierValue: Number(e.target.value) })}
+            className={`${field} font-mono`}
+            style={edit?.modifierValue !== undefined ? { borderColor: 'var(--color-jade)' } : undefined}
+          />
+        </label>
+      )}
+
+      <div className="flex flex-wrap gap-2 pt-1">
+        {dirty && !deleted && (
+          <button onClick={onReset} className="panel px-3 py-2 text-xs text-ink-mute hover:text-jade">
+            {t('inventory.resetSlot')}
+          </button>
+        )}
+        <button
+          onClick={onToggleDelete}
+          className="panel px-3 py-2 text-xs"
+          style={{ color: deleted ? 'var(--color-jade)' : 'var(--color-gloom)' }}
+        >
+          {deleted ? t('inventory.undoDelete') : t('inventory.deleteSlot')}
+        </button>
+      </div>
+
+      {deleted && <p className="text-[10px] leading-relaxed" style={{ color: 'var(--color-gloom)' }}>{t('inventory.deleteSlotHint')}</p>}
+      {(dirty || deleted) && (
+        <Link to="/save" className="block text-xs underline decoration-edge-lit underline-offset-2 hover:text-jade">
+          {t('inventory.goToSave')}
+        </Link>
+      )}
     </div>
   )
 }

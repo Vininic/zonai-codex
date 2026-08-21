@@ -9,10 +9,13 @@ import { getSessionSave } from './saveSession'
  * stats, laço (bond) como float, e um BoolArray de verdade (1 bit por
  * cavalo, não 4 bytes) pro "familiaridade conferida".
  *
- * Só expomos leitura (listagem) + a gravação de um único cavalo novo, que é
- * o que o editor precisa: soltar a Epona (exclusiva de amiibo) num slot vazio
- * com os valores padrão do próprio jogo (Horse.DEFAULT_VALUES.GameRomHorseEpona
- * no editor de referência) — mane/saddle/reins/stats/cor tudo do amiibo real.
+ * Expomos leitura do estábulo, edição dos campos que valem a pena mexer
+ * (nome, laço, stats, crina/sela/rédea) e a liberação da Epona — exclusiva de
+ * amiibo — com os valores padrão do próprio jogo
+ * (Horse.DEFAULT_VALUES.GameRomHorseEpona no editor de referência). Os ~20
+ * campos de cor por canal RGB ficam de fora de propósito: editá-los à mão
+ * sem um color picker é mais chance de estragar o cavalo do que de melhorá-lo.
+ * A gravação em si vive em saveWriter.ts, junto com o resto do plano.
  */
 
 const INT_FIELDS = [
@@ -50,6 +53,24 @@ export interface HorseSlot {
   name: string
   horseType: number
   bond: number
+  statsStrength: number
+  statsSpeed: number
+  statsStamina: number
+  statsPull: number
+  mane: string
+  saddle: string
+  rein: string
+}
+
+/** listas de aparência (mesmos valores do Pouch.Structs.HORSES de referência) */
+export const MANES = ['None','Horse_Link_Mane','Horse_Link_Mane_01','Horse_Link_Mane_02','Horse_Link_Mane_03','Horse_Link_Mane_04','Horse_Link_Mane_05','Horse_Link_Mane_06','Horse_Link_Mane_07','Horse_Link_Mane_08','Horse_Link_Mane_09','Horse_Link_Mane_10','Horse_Link_Mane_11','Horse_Link_Mane_12','Horse_Link_Mane_00L','Horse_Link_Mane_01L','Horse_Link_Mane_00S']
+export const SADDLES = ['None','GameRomHorseSaddle_00','GameRomHorseSaddle_01','GameRomHorseSaddle_02','GameRomHorseSaddle_03','GameRomHorseSaddle_04','GameRomHorseSaddle_05','GameRomHorseSaddle_06','GameRomHorseSaddle_07','GameRomHorseSaddle_00L','GameRomHorseSaddle_00S']
+export const REINS = ['None','GameRomHorseReins_00','GameRomHorseReins_01','GameRomHorseReins_02','GameRomHorseReins_03','GameRomHorseReins_04','GameRomHorseReins_05','GameRomHorseReins_06','GameRomHorseReins_00L','GameRomHorseReins_00S']
+
+/** enum é gravado como hash do nome; desfaz isso pra exibir */
+const reverseEnum = (list: string[], raw: number): string => {
+  for (const name of list) if (murmur3(name) === (raw >>> 0)) return name
+  return raw === 0 ? 'None' : `0x${(raw >>> 0).toString(16)}`
 }
 
 export interface HorsePouch {
@@ -79,6 +100,10 @@ export function readHorses(): HorsePouch | null {
   const typePtr = save.values.get(H('HorseType'))
   const bondPtr = save.values.get(H('Familiarity'))
   if (namePtr === undefined || wnamePtr === undefined || typePtr === undefined || bondPtr === undefined) return null
+  const u32 = (field: string, i: number, dvv: DataView) => {
+    const ptr = save.values.get(H(field))
+    return ptr === undefined ? 0 : dvv.getUint32(ptr + 4 + i * 4, true)
+  }
 
   const dv = new DataView(save.buffer)
   const bytes = new Uint8Array(save.buffer)
@@ -104,6 +129,13 @@ export function readHorses(): HorsePouch | null {
       name: readWString16(dv, wnamePtr + 4 + i * 0x20),
       horseType: dv.getInt32(typePtr + 4 + i * 4, true),
       bond: dv.getFloat32(bondPtr + 4 + i * 4, true),
+      statsStrength: u32('Toughness', i, dv),
+      statsSpeed: u32('Speed', i, dv),
+      statsStamina: u32('ChargeNum', i, dv),
+      statsPull: u32('HorsePower', i, dv),
+      mane: reverseEnum(MANES, u32('Mane', i, dv)),
+      saddle: reverseEnum(SADDLES, u32('Saddle', i, dv)),
+      rein: reverseEnum(REINS, u32('Rein', i, dv)),
     })
   }
 

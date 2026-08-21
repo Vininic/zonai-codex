@@ -54,6 +54,30 @@ export interface EquipmentGrant {
   modifierValue: number
 }
 
+/**
+ * Alteração num slot de equipamento que JÁ existe no save, identificado por
+ * `${category}:${index}` (o índice é o slot real no array do pouch, não a
+ * posição na grade). `null` em `deleted` marca o slot pra ser esvaziado.
+ */
+export interface EquipmentEdit {
+  durability?: number
+  modifier?: string
+  modifierValue?: number
+}
+
+/** Alteração num cavalo que já existe, por índice de slot em OwnedHorseList. */
+export interface HorseEdit {
+  name?: string
+  bond?: number
+  statsStrength?: number
+  statsSpeed?: number
+  statsStamina?: number
+  statsPull?: number
+  mane?: string
+  saddle?: string
+  rein?: string
+}
+
 export interface ImportDiff {
   fromFile: string
   toFile: string
@@ -100,6 +124,14 @@ interface AppState {
   /** equipamento a conceder em slots vazios do pouch, staged pro editor */
   equipmentGrants: EquipmentGrant[]
   grantEpona: boolean
+  /** chave `${category}:${index}` -> campos alterados */
+  equipmentEdits: Record<string, EquipmentEdit>
+  /** chaves `${category}:${index}` a esvaziar */
+  equipmentDeletes: string[]
+  /** índice do slot em OwnedHorseList -> campos alterados */
+  horseEdits: Record<number, HorseEdit>
+  /** índices de slot de cavalo a esvaziar */
+  horseDeletes: number[]
 
   setLang: (lang: 'en' | 'pt') => void
   setTheme: (theme: 'dark' | 'light') => void
@@ -124,6 +156,13 @@ interface AppState {
   addEquipmentGrant: (grant: EquipmentGrant) => void
   removeEquipmentGrant: (index: number) => void
   setGrantEpona: (v: boolean) => void
+  setEquipmentEdit: (key: string, patch: EquipmentEdit) => void
+  clearEquipmentEdit: (key: string) => void
+  toggleEquipmentDelete: (key: string) => void
+  setHorseEdit: (index: number, patch: HorseEdit) => void
+  clearHorseEdit: (index: number) => void
+  toggleHorseDelete: (index: number) => void
+  clearPouchEdits: () => void
   /** restaura um backup JSON exportado */
   restore: (snapshot: Partial<Pick<AppState, 'manual' | 'fromSave' | 'player' | 'saveMeta' | 'excluded'>>) => void
 }
@@ -152,6 +191,10 @@ export const useAppStore = create<AppState>()(
       playerEdits: {},
       equipmentGrants: [],
       grantEpona: false,
+      equipmentEdits: {},
+      equipmentDeletes: [],
+      horseEdits: {},
+      horseDeletes: [],
 
       setLang: (lang) => set({ lang }),
       setTheme: (theme) => set({ theme }),
@@ -198,6 +241,35 @@ export const useAppStore = create<AppState>()(
       removeEquipmentGrant: (index) =>
         set((s) => ({ equipmentGrants: s.equipmentGrants.filter((_, i) => i !== index) })),
       setGrantEpona: (v) => set({ grantEpona: v }),
+      setEquipmentEdit: (key, patch) =>
+        set((s) => ({ equipmentEdits: { ...s.equipmentEdits, [key]: { ...s.equipmentEdits[key], ...patch } } })),
+      clearEquipmentEdit: (key) =>
+        set((s) => {
+          const equipmentEdits = { ...s.equipmentEdits }
+          delete equipmentEdits[key]
+          return { equipmentEdits }
+        }),
+      toggleEquipmentDelete: (key) =>
+        set((s) => ({
+          equipmentDeletes: s.equipmentDeletes.includes(key)
+            ? s.equipmentDeletes.filter((k) => k !== key)
+            : [...s.equipmentDeletes, key],
+        })),
+      setHorseEdit: (index, patch) =>
+        set((s) => ({ horseEdits: { ...s.horseEdits, [index]: { ...s.horseEdits[index], ...patch } } })),
+      clearHorseEdit: (index) =>
+        set((s) => {
+          const horseEdits = { ...s.horseEdits }
+          delete horseEdits[index]
+          return { horseEdits }
+        }),
+      toggleHorseDelete: (index) =>
+        set((s) => ({
+          horseDeletes: s.horseDeletes.includes(index)
+            ? s.horseDeletes.filter((i) => i !== index)
+            : [...s.horseDeletes, index],
+        })),
+      clearPouchEdits: () => set({ equipmentEdits: {}, equipmentDeletes: [], horseEdits: {}, horseDeletes: [], equipmentGrants: [], grantEpona: false }),
       restore: (snapshot) => set(snapshot),
     }),
     { name: 'zonai-codex' },
