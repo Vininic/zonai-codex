@@ -12,6 +12,7 @@ import { REGIONS, regionById } from '../lib/regions'
 import { categoryMeta } from '../lib/categoryMeta'
 import { itemLabel } from '../lib/itemLabel'
 import { buildReportHtml } from '../lib/reportHtml'
+import { encodeReportState } from '../lib/reportState'
 import { computeProgress } from '../lib/useDataset'
 import { PlanFlow, type FlowStepDef } from '../components/PlanFlow'
 import { RouteArtifact } from '../components/RouteArtifact'
@@ -656,6 +657,17 @@ function ReportCard({ plan, groupName }: { plan: ReportPlan; groupName: (id: str
   const { t } = useTranslation()
   const navigate = useNavigate()
   const setRoute = useAppStore((s) => s.setRoute)
+  const data = useDataset()
+  const manual = useAppStore((s) => s.manual)
+  const fromSave = useAppStore((s) => s.fromSave)
+  const [copied, setCopied] = useState(false)
+
+  /** o relatório inteiro cabe numa URL: só os bits do que falta (ver reportState) */
+  const reportUrl = () => {
+    const ids = [...plan.mapPending.map((g) => g.categoryId), ...plan.checklists.map((c) => c.statId)]
+    const d = encodeReportState(data, manual, fromSave, ids)
+    return `${location.origin}${location.pathname}#/report?d=${d}`
+  }
 
   async function downloadReport() {
     const html = await buildReportHtml({
@@ -759,6 +771,22 @@ function ReportCard({ plan, groupName }: { plan: ReportPlan; groupName: (id: str
             {t('route.openFullMap')}
           </button>
         )}
+        <button
+          onClick={() => navigate(`/report?d=${encodeReportState(data, manual, fromSave, [...plan.mapPending.map((g) => g.categoryId), ...plan.checklists.map((c) => c.statId)])}`)}
+          className="btn-jade !px-3 !py-1.5 !text-xs"
+        >
+          {t('report.openHere')}
+        </button>
+        <button
+          onClick={() => {
+            navigator.clipboard?.writeText(reportUrl())
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2000)
+          }}
+          className="panel px-3 py-1.5 text-xs text-ink-mute hover:text-jade"
+        >
+          {copied ? t('report.copied') : t('report.copy')}
+        </button>
         <button onClick={downloadReport} className="panel px-3 py-1.5 text-xs text-ink-mute hover:text-jade">
           {t('companion.downloadReport')}
         </button>

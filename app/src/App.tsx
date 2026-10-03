@@ -8,6 +8,7 @@ import { Dashboard } from './pages/Dashboard'
 import { Tracker } from './pages/Tracker'
 import { Category } from './pages/Category'
 import { Inventory } from './pages/Inventory'
+import { ReportPage } from './pages/ReportPage'
 import { SavePage } from './pages/SavePage'
 import { NotFound } from './pages/NotFound'
 
@@ -57,6 +58,7 @@ export default function App() {
               }
             />
             <Route path="save" element={<SavePage />} />
+            <Route path="report" element={<ReportPage />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>

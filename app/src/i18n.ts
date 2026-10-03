@@ -215,6 +215,15 @@ const resources = {
         toastJsonImported: 'Progress restored',
         emptyState: 'Import a progress.sav (or load the demo) to unlock editing — staged tracker changes and player stats get written into a new save file, with a diff of everything that changed.',
       },
+      report: {
+        title: 'Completion report',
+        sub: '{{count}} still missing · rebuilt from the link, no file needed',
+        noLink: 'Open this page from a report link.',
+        badLink: 'This link was made with a different dataset version — generate a new one.',
+        copy: 'Copy phone link',
+        copied: 'Link copied',
+        openHere: 'Open report',
+      },
       route: {
         title: 'Optimized route',
         stops: 'Stops',
@@ -443,6 +452,15 @@ const resources = {
         toastJsonExported: 'Backup baixado',
         toastJsonImported: 'Progresso restaurado',
         emptyState: 'Importe um progress.sav (ou carregue o demo) pra liberar a edição — mudanças staged do tracker e stats do player são gravadas num novo arquivo de save, com diff de tudo que mudou.',
+      },
+      report: {
+        title: 'Relatório de conclusão',
+        sub: '{{count}} faltando · remontado do link, sem arquivo',
+        noLink: 'Abra esta página a partir de um link de relatório.',
+        badLink: 'Este link foi feito com outra versão do dataset — gere um novo.',
+        copy: 'Copiar link pro celular',
+        copied: 'Link copiado',
+        openHere: 'Abrir relatório',
       },
       route: {
         title: 'Rota otimizada',
