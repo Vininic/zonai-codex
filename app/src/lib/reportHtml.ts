@@ -1,4 +1,5 @@
 import { categoryMeta } from './categoryMeta'
+import { REGIONS, inRegion } from './regions'
 
 /**
  * Relatório visual: um .html sozinho, com o mapa desenhado.
@@ -50,9 +51,14 @@ export interface ReportInput {
     generated: string
     mapHint: string
     showLine: string
+    zoom: string
     allGroups: string
   }
 }
+
+/** nome da região que contém o ponto — o que dá pra usar quando o item não tem
+ *  nome próprio (placas do Addison, poços numerados) */
+const regionOf = (x: number, z: number): string => REGIONS.find((r) => inRegion(r, x, z))?.name ?? '—'
 
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -140,7 +146,7 @@ export async function buildReportHtml(input: ReportInput): Promise<string> {
       (s, i) =>
         `<tr><td class="n">${i + 1}</td><td>${esc(s.label)}</td><td class="g">${esc(
           groups.find((g) => g.categoryId === s.groupId)?.label ?? s.groupId,
-        )}</td><td class="c">${Math.round(s.x)}, ${Math.round(s.z)}</td></tr>`,
+        )}</td><td class="r">${esc(regionOf(s.x, s.z))}</td><td class="c">${Math.round(s.x)}, ${Math.round(s.z)}</td></tr>`,
     )
     .join('')
 
@@ -150,7 +156,12 @@ export async function buildReportHtml(input: ReportInput): Promise<string> {
   <h2><span class="dot" style="background:${categoryMeta(g.categoryId).color}"></span>${esc(g.label)}
     <span class="count">${g.items.length} ${esc(S.pending)}</span></h2>
   <ul class="cols">${g.items
-    .map((it) => `<li>${esc(it.label)} <span class="c">${Math.round(it.x)}, ${Math.round(it.z)}</span></li>`)
+    .map(
+      (it) =>
+        `<li>${esc(it.label)} <span class="r">${esc(regionOf(it.x, it.z))}</span> <span class="c">${Math.round(
+          it.x,
+        )}, ${Math.round(it.z)}</span></li>`,
+    )
     .join('')}</ul>
 </section>`,
     )
@@ -201,7 +212,9 @@ export async function buildReportHtml(input: ReportInput): Promise<string> {
   table{width:100%;border-collapse:collapse;font-size:13px}
   td{padding:5px 6px;border-bottom:1px solid rgba(36,50,44,.5);vertical-align:top}
   td.n{width:30px;color:var(--gold);font-variant-numeric:tabular-nums;text-align:right;font-weight:600}
-  td.g{color:var(--mute);width:140px}
+  td.g{color:var(--mute);width:130px}
+  td.r,.r{color:var(--gold);font-size:12px}
+  td.r{width:120px}
   .c{color:var(--faint);font-family:ui-monospace,monospace;font-size:11px;white-space:nowrap}
   td.c{text-align:right;width:104px}
   ul.cols{columns:2;gap:24px;list-style:none;padding:0;margin:0;font-size:14px}
@@ -232,6 +245,7 @@ ${
   </div>
   <div class="bar">
     <button class="tg on" id="tline">${esc(S.showLine)}</button>
+    <button class="tg" id="tzoom">${esc(S.zoom)}</button>
     <button class="lg on" id="tall">${esc(S.allGroups)} <b>${totalMap}</b></button>
     ${legend}
   </div>
@@ -267,8 +281,15 @@ ${checkSections}
     btns.forEach(function(b){ b.classList.toggle('on', turnOn); });
     apply();
   };
-  // tocar no mapa alterna "caber na tela" / tamanho real com rolagem
-  if(vp) vp.addEventListener('dblclick', function(){ vp.classList.toggle('zoom'); });
+  // Botao explicito em vez de duplo-toque: no celular dblclick nao dispara de
+  // forma confiavel (o navegador usa o gesto pra zoom da pagina), entao o
+  // duplo-toque simplesmente nao existia pra quem ia usar isso no telefone.
+  var tzoom=document.getElementById('tzoom');
+  if(tzoom&&vp) tzoom.onclick=function(){
+    var on=vp.classList.toggle('zoom');
+    tzoom.classList.toggle('on', on);
+    if(on) vp.scrollLeft=(vp.scrollWidth-vp.clientWidth)/2;
+  };
 })();
 </script>
 </body></html>`

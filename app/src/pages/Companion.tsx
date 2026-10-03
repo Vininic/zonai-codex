@@ -681,6 +681,7 @@ function ReportCard({ plan, groupName }: { plan: ReportPlan; groupName: (id: str
         generated: t('companion.reportTitle'),
         mapHint: t('companion.reportMapHint'),
         showLine: t('companion.reportShowLine'),
+        zoom: t('companion.reportZoom'),
         allGroups: t('companion.reportAllGroups'),
       },
     })

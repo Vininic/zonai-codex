@@ -10,7 +10,10 @@ export function itemLabel(item: CategoryItem | StatItem): string {
   if ('note' in item && item.note) {
     // notas começam com o GUID do objeto; o resto (quando existe) é descritivo
     const cleaned = item.note.replace(/^\d{12,}\s*-?\s*/, '').trim()
-    if (cleaned) return cleaned
+    // nas placas do Addison a nota é SÓ o GUID em hex ("0x70d0ac829afa29d1"),
+    // que não diz nada a ninguém — melhor cair pra coordenada, que ao menos
+    // localiza. O dataset não tem nome pra elas.
+    if (cleaned && !/^0x[0-9a-f]+$/i.test(cleaned)) return cleaned
   }
   if ('x' in item && typeof item.x === 'number') {
     const layer = 'layer' in item && item.layer ? ` · ${item.layer}` : ''

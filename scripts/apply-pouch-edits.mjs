@@ -46,6 +46,10 @@ function murmur3(str) {
 const inPath = process.argv[2];
 const outPath = process.argv[3];
 const dry = process.argv.includes('--dry');
+// --only=shields|arrows|horse isola UMA mudanca, pra bissecar qual quebra o save
+const onlyArg = process.argv.find((a) => a.startsWith('--only='));
+const only = onlyArg ? onlyArg.slice(7) : null;
+const want = (what) => only === null || only === what;
 if (!inPath || !outPath) {
   console.error('uso: node scripts/apply-pouch-edits.mjs <entrada.sav> <saida.sav> [--dry]');
   process.exit(1);
@@ -90,7 +94,7 @@ const setU32 = (ptr, i, v) => dv.setUint32(ptr + 4 + i * 4, v >>> 0, true);
 const log = [];
 
 // ---- 1) escudos: enche todo slot livre DENTRO da capacidade desbloqueada ----
-{
+if (want('shields')) {
   // CRÍTICO: o array tem 40 posições físicas, mas o jogo só considera válidas
   // as primeiras `Pouch.Shield.ValidNum` (as que você desbloqueou com os
   // Korok seeds). Escrever além disso corrompe o save — o jogo trata o arquivo
@@ -131,7 +135,7 @@ const log = [];
 }
 
 // ---- 2) flechas ----
-{
+if (want('arrows')) {
   const nP = values.get(murmur3('Pouch.Arrow.Content.Name'));
   const sP = values.get(murmur3('Pouch.Arrow.Content.StockNum'));
   if (nP === undefined || sP === undefined) {
@@ -155,7 +159,7 @@ const log = [];
 }
 
 // ---- 3) cavalo com stats no máximo ----
-{
+if (want('horse')) {
   const H = (f) => values.get(murmur3('OwnedHorseList.' + f));
   const nP = H('ActorName');
   const wP = H('Name');
