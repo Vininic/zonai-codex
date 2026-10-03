@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { parseSave, SaveParseError } from '../lib/saveParser'
 import { evaluateSave } from '../lib/completion'
 import { computeImportDiff } from '../lib/importDiff'
-import { applyEdits, buildEditPlan, computeStaged, type PlayerEdits } from '../lib/saveWriter'
+import { applyEdits, buildEditPlan, computeStaged, SaveIntegrityError, type PlayerEdits } from '../lib/saveWriter'
 import { getSessionSave, setSessionSave } from '../lib/saveSession'
 import { useDataset } from '../lib/useDataset'
 import { DiffView } from '../components/DiffView'
@@ -254,6 +254,8 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
   const removeEquipmentGrant = useAppStore((s) => s.removeEquipmentGrant)
   const grantEpona = useAppStore((s) => s.grantEpona)
   const setGrantEpona = useAppStore((s) => s.setGrantEpona)
+  /** erro de integridade do export — bloqueia o download em vez de entregar lixo */
+  const [exportError, setExportError] = useState<string | null>(null)
   const equipmentEdits = useAppStore((s) => s.equipmentEdits)
   const equipmentDeletes = useAppStore((s) => s.equipmentDeletes)
   const horseEdits = useAppStore((s) => s.horseEdits)
@@ -305,7 +307,17 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
 
   async function exportEdited() {
     if (!session) return
-    const { buffer } = applyEdits(session.buffer, plan)
+    let buffer: ArrayBuffer
+    try {
+      ;({ buffer } = applyEdits(session.buffer, plan))
+    } catch (e) {
+      // nunca entregar um save que não passou na checagem de integridade
+      if (e instanceof SaveIntegrityError) {
+        setExportError([t('save.integrityFailed'), ...e.problems.slice(0, 6)].join(String.fromCharCode(10)))
+        return
+      }
+      throw e
+    }
     const name = 'progress.sav'
     download(new Blob([buffer], { type: 'application/octet-stream' }), name)
     // reimporta o save editado: o tracker sincroniza e o diff do import mostra o que mudou
@@ -443,6 +455,12 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
           {unsupported.length > 0 && (
             <p className="text-[11px] text-ink-faint">
               {t('save.unsupported')}: {unsupported.map((sg) => `${groupName(sg.groupId, sg.label)} (+${sg.itemIds.length})`).join(', ')}
+            </p>
+          )}
+
+          {exportError && (
+            <p className="whitespace-pre-wrap text-[11px] leading-relaxed" style={{ color: 'var(--color-gloom)' }}>
+              {exportError}
             </p>
           )}
 

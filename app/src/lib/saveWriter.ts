@@ -2,7 +2,7 @@ import { CLEAR_HASH, META_SAVE_TYPE, type PlayerStats } from './saveParser'
 import { murmur3 } from './murmur3'
 import type { CompletionData, Category, Stat, StatItem } from './dataset'
 import type { EquipmentEdit, EquipmentGrant, HorseEdit, PlayerEdits as PlayerEditsType, Progress } from '../store/appStore'
-import { equipArrays, modifierHash } from './equipment'
+import { EMPTY_SLOT, equipArrays, modifierHash, noneEffect, type EquipCategory } from './equipment'
 import { buildEponaGrant, horseFieldHash } from './horse'
 import { murmur3 as hashName } from './murmur3'
 
@@ -308,16 +308,21 @@ export function buildEditPlan(
       }
       if (idx === -1) continue // pouch cheio: nada a fazer, e nada é sobrescrito
       used.add(idx)
-      arrayWrites.push({
-        namesPtr: arrays.namePtr,
-        index: idx,
-        actorName: grant.id,
-        ints: [
-          { ptr: arrays.lifePtr, value: Math.max(1, Math.round(grant.durability)) },
-          { ptr: arrays.effectTypePtr, value: modifierHash(grant.modifier) },
-          { ptr: arrays.effectValuePtr, value: grant.modifier === 'None' ? 0 : Math.max(0, Math.round(grant.modifierValue)) },
-        ],
-      })
+      // TODO campo paralelo precisa sair do sentinela de slot vazio (-1), não
+      // só nome e durabilidade — senão o item fica meio-criado e o jogo
+      // descarta o save inteiro. Ver EMPTY_SLOT em equipment.ts.
+      const ints = [
+        { ptr: arrays.lifePtr, value: Math.max(1, Math.round(grant.durability)) },
+        { ptr: arrays.effectTypePtr, value: modifierHash(grant.modifier) },
+        { ptr: arrays.effectValuePtr, value: grant.modifier === 'None' ? EMPTY_SLOT : Math.max(0, Math.round(grant.modifierValue)) },
+      ]
+      if (arrays.combinedLifePtr !== undefined) ints.push({ ptr: arrays.combinedLifePtr, value: 0 })
+      if (arrays.extraLifePtr !== undefined) ints.push({ ptr: arrays.extraLifePtr, value: 0 })
+      if (arrays.recordExtraLifePtr !== undefined) ints.push({ ptr: arrays.recordExtraLifePtr, value: 0 })
+      arrayWrites.push({ namesPtr: arrays.namePtr, index: idx, actorName: grant.id, ints })
+      // o nome do item fundido vive noutro String64Array e precisa ficar vazio
+      if (arrays.combinedNamePtr !== undefined)
+        arrayWrites.push({ namesPtr: arrays.combinedNamePtr, index: idx, actorName: '' })
       itemCount++
     }
   }
@@ -362,17 +367,20 @@ export function buildEditPlan(
       if (!arrays) continue
       const names = readString64Raw(buffer, arrays.namePtr)
       if (!names[parsed.index]) continue
-      // nome vazio = slot livre; zera os paralelos pra não deixar lixo
-      arrayWrites.push({
-        namesPtr: arrays.namePtr,
-        index: parsed.index,
-        actorName: '',
-        ints: [
-          { ptr: arrays.lifePtr, value: 0 },
-          { ptr: arrays.effectTypePtr, value: 0 },
-          { ptr: arrays.effectValuePtr, value: 0 },
-        ],
-      })
+      // slot livre tem convenção própria: nome "", -1 nos numéricos e o hash de
+      // 'None' no modificador. Zerar tudo deixaria um slot que não é nem item
+      // nem vazio.
+      const ints = [
+        { ptr: arrays.lifePtr, value: EMPTY_SLOT },
+        { ptr: arrays.effectTypePtr, value: noneEffect() },
+        { ptr: arrays.effectValuePtr, value: EMPTY_SLOT },
+      ]
+      if (arrays.combinedLifePtr !== undefined) ints.push({ ptr: arrays.combinedLifePtr, value: EMPTY_SLOT })
+      if (arrays.extraLifePtr !== undefined) ints.push({ ptr: arrays.extraLifePtr, value: EMPTY_SLOT })
+      if (arrays.recordExtraLifePtr !== undefined) ints.push({ ptr: arrays.recordExtraLifePtr, value: EMPTY_SLOT })
+      arrayWrites.push({ namesPtr: arrays.namePtr, index: parsed.index, actorName: '', ints })
+      if (arrays.combinedNamePtr !== undefined)
+        arrayWrites.push({ namesPtr: arrays.combinedNamePtr, index: parsed.index, actorName: '' })
       itemCount++
     }
 
@@ -511,7 +519,23 @@ export function buildEditPlan(
   return { writes, arrayWrites, itemCount, skipped }
 }
 
-/** aplica o plano num clone do buffer original e devolve o novo save */
+export class SaveIntegrityError extends Error {
+  problems: string[]
+  constructor(problems: string[]) {
+    super(`save inconsistente: ${problems.length} problema(s)`)
+    this.name = 'SaveIntegrityError'
+    this.problems = problems
+  }
+}
+
+/**
+ * Aplica o plano num clone do buffer original e devolve o novo save.
+ *
+ * Antes de devolver, relê o resultado e confere a integridade dos slots de
+ * equipamento (ver validateEquipment). Se algo ficou inconsistente, LANÇA em
+ * vez de devolver — é melhor falhar na cara do usuário do que entregar um
+ * arquivo que manda ele pro começo do jogo sem nenhum aviso.
+ */
 export function applyEdits(original: ArrayBuffer, plan: EditPlan): { buffer: ArrayBuffer; applied: number } {
   const buffer = original.slice(0)
   const dv = new DataView(buffer)
@@ -553,5 +577,54 @@ export function applyEdits(original: ArrayBuffer, plan: EditPlan): { buffer: Arr
     }
     applied++
   }
+
+  const values = new Map<number, number>()
+  for (let off = 0x28; off < buffer.byteLength - 8; off += 8) {
+    const hash = dv.getUint32(off, true)
+    if (hash === META_SAVE_TYPE) break
+    values.set(hash, dv.getUint32(off + 4, true))
+  }
+  const problems = validateEquipment(buffer, values)
+  if (problems.length) throw new SaveIntegrityError(problems)
+
   return { buffer, applied }
 }
+
+/**
+ * Confere, no buffer JÁ gravado, se todo slot de equipamento está coerente.
+ *
+ * Existe porque entregar um save corrompido é a pior falha possível aqui: o
+ * jogo não avisa nada, só abre na tela inicial como se não houvesse save. Um
+ * item meio-criado (nome preenchido mas Combined.Life/ExtraLife ainda no
+ * sentinela -1 de slot vazio) é invisível em qualquer leitura normal — e foi
+ * exatamente o que aconteceu. Em vez de confiar que o writer acertou, lê de
+ * volta e verifica.
+ *
+ * Devolve a lista de problemas; vazia = pode exportar.
+ */
+export function validateEquipment(buffer: ArrayBuffer, values: Map<number, number>): string[] {
+  const problems: string[] = []
+  const dv = new DataView(buffer)
+  for (const cat of ['bows', 'weapons', 'shields'] as EquipCategory[]) {
+    const a = equipArrays(values, cat, buffer)
+    if (!a) continue
+    const names = readString64Raw(buffer, a.namePtr)
+
+    for (let i = 0; i < Math.min(names.length, a.capacity); i++) {
+      const occupied = names[i] !== ''
+      const life = dv.getInt32(a.lifePtr + 4 + i * 4, true)
+      // Só o que é mesmo invariante em saves reais. Combined.Life/ExtraLife
+      // aceitam -1 num item ocupado (visto no save do próprio jogo), então
+      // exigir 0 ali reprovaria arquivos legítimos.
+      if (occupied && life < 0) problems.push(`${cat}[${i}] "${names[i]}": durabilidade ${life}`)
+      if (!occupied && life !== EMPTY_SLOT) problems.push(`${cat}[${i}] vazio mas Life=${life}`)
+    }
+
+    // isto sim quebra o save: item num slot que o jogador não desbloqueou
+    for (let i = a.capacity; i < names.length; i++) {
+      if (names[i] !== '') problems.push(`${cat}[${i}] "${names[i]}" além do ValidNum (${a.capacity})`)
+    }
+  }
+  return problems
+}
+

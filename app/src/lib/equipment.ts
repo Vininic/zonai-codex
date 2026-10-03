@@ -63,8 +63,28 @@ export interface EquipArrays {
   lifePtr: number
   effectTypePtr: number
   effectValuePtr: number
+  /** só arma e escudo têm fusão; arco não tem nenhum destes */
+  combinedNamePtr?: number
+  combinedLifePtr?: number
+  extraLifePtr?: number
+  /** só arma */
+  recordExtraLifePtr?: number
   capacity: number
 }
+
+/**
+ * Convenção de slot VAZIO, lida de saves reais: nome "" e **-1** em todo
+ * campo numérico (exceto Effect.Type, que fica no hash de 'None'). Slot
+ * OCUPADO usa 0 nos campos de fusão.
+ *
+ * Isso não é detalhe estético: criar um item preenchendo só nome/durabilidade
+ * e deixando Combined.Life/ExtraLife em -1 produz um item que existe mas tem
+ * campos de slot vazio. O jogo rejeita o arquivo inteiro e abre na tela
+ * inicial, como se não houvesse save. Arco não tem esses campos, por isso
+ * conceder arco sempre funcionou e conceder escudo quebrava.
+ */
+export const EMPTY_SLOT = -1
+export const noneEffect = () => murmur3('None')
 
 export interface EquipSlot {
   index: number
@@ -114,7 +134,17 @@ export function equipArrays(values: Map<number, number>, cat: EquipCategory, buf
   const physical = dv.getUint32(namePtr, true)
   const validPtr = values.get(VALID_NUM_HASH[cat])
   const unlocked = validPtr === undefined ? physical : dv.getUint32(validPtr + 4, true)
-  return { namePtr, lifePtr, effectTypePtr, effectValuePtr, capacity: Math.min(physical, unlocked) }
+  return {
+    namePtr,
+    lifePtr,
+    effectTypePtr,
+    effectValuePtr,
+    combinedNamePtr: values.get(murmur3(`${p}.Content.Combined.Name`)),
+    combinedLifePtr: values.get(murmur3(`${p}.Content.Combined.Life`)),
+    extraLifePtr: values.get(murmur3(`${p}.Content.ExtraLife`)),
+    recordExtraLifePtr: values.get(murmur3(`${p}.Content.RecordExtraLife`)),
+    capacity: Math.min(physical, unlocked),
+  }
 }
 
 /** lê o pouch da categoria a partir do save da sessão */

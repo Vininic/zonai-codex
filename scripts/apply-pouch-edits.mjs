@@ -19,7 +19,7 @@ const ARROW_TARGET = 999;
  * valor que o próprio jogo grava. Força vai a 350 (teto do editor de
  * referência), velocidade e tração a 4 (★★★★★).
  */
-const HORSE_MAX = { name: 'Nightmare', toughness: 350, speed: 4, stamina: 0, pull: 4, bond: 1 };
+const HORSE_MAX = { name: 'Nightmare', toughness: 350, speed: 4, stamina: 5, pull: 4, bond: 1 };
 // -----------------------------------------------------------------------
 
 function murmur3(str) {
@@ -97,6 +97,9 @@ const log = [];
   // como inválido e cai na tela inicial. Aprendido do jeito ruim.
   const validPtr = values.get(0x05271e7d); // Pouch.Shield.ValidNum
   const nP = values.get(murmur3('Pouch.Shield.Content.Name'));
+  const fuseNameP = values.get(murmur3('Pouch.Shield.Content.Combined.Name'));
+  const fuseLifeP = values.get(murmur3('Pouch.Shield.Content.Combined.Life'));
+  const extraLifeP = values.get(murmur3('Pouch.Shield.Content.ExtraLife'));
   const lP = values.get(murmur3('Pouch.Shield.Content.Life'));
   const eP = values.get(murmur3('Pouch.Shield.Content.Effect.Type'));
   const vP = values.get(murmur3('Pouch.Shield.Content.Effect.Value'));
@@ -112,8 +115,14 @@ const log = [];
       if (!dry) {
         writeName(nP, i, SHIELD_FILL.id);
         setU32(lP, i, SHIELD_FILL.durability);
-        setU32(eP, i, 0); // sem modificador
-        setU32(vP, i, 0);
+        setU32(eP, i, murmur3('None'));
+        setU32(vP, i, 0xffffffff); // sem modificador = -1, como nos itens do jogo
+        // Um escudo criado precisa ficar IDENTICO a um que o jogo criou: os
+        // 7 ocupados deste save tem fuseName vazio e fuseLife/extraLife = 0.
+        // Deixar -1 (sentinela de slot vazio) produz um item meio-criado.
+        if (fuseNameP !== undefined) writeName(fuseNameP, i, '');
+        if (fuseLifeP !== undefined) setU32(fuseLifeP, i, 0);
+        if (extraLifeP !== undefined) setU32(extraLifeP, i, 0);
       }
       added++;
     }
@@ -170,7 +179,7 @@ const log = [];
         setU32(H('HorsePower'), idx, HORSE_MAX.pull);
         dv.setFloat32(H('Familiarity') + 4 + idx * 4, HORSE_MAX.bond, true);
       }
-      log.push(`cavalo "${HORSE_MAX.name}" (slot ${idx}): ${antes} -> forca=${HORSE_MAX.toughness} vel=${HORSE_MAX.speed} stam=${HORSE_MAX.stamina}(infinito) tracao=${HORSE_MAX.pull}`);
+      log.push(`cavalo "${HORSE_MAX.name}" (slot ${idx}): ${antes} -> forca=${HORSE_MAX.toughness} vel=${HORSE_MAX.speed} stam=${HORSE_MAX.stamina} tracao=${HORSE_MAX.pull}`);
     }
   }
 }
