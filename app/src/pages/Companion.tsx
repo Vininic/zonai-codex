@@ -239,8 +239,16 @@ export function Companion() {
       )[0]?.[0] ?? 'surface'
     const origin =
       player?.position && player.position.layer === layer ? { x: player.position.x, z: player.position.z } : null
+    // maxStops padrão (24) é uma viagem; num relatório o que se quer é o
+    // caminho por TUDO que falta, senão o mapa mostra 24 de 104 e parece que
+    // o resto não existe
     const route = categoryIds.length
-      ? optimizeRoute(data, manual, fromSave, { categories: new Set(categoryIds), layer, origin })
+      ? optimizeRoute(data, manual, fromSave, {
+          categories: new Set(categoryIds),
+          layer,
+          origin,
+          maxStops: 500,
+        })
       : { stops: [] as RouteStep[] }
 
     const mapPending = categoryIds.map((id) => {
@@ -669,9 +677,11 @@ function ReportCard({ plan, groupName }: { plan: ReportPlan; groupName: (id: str
       strings: {
         route: t('route.title'),
         pending: t('companion.pending'),
-        remaining: t('companion.pending'),
         noRoute: t('companion.checklistNoRoute'),
         generated: t('companion.reportTitle'),
+        mapHint: t('companion.reportMapHint'),
+        showLine: t('companion.reportShowLine'),
+        allGroups: t('companion.reportAllGroups'),
       },
     })
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
