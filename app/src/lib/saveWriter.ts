@@ -314,7 +314,8 @@ export function buildEditPlan(
       const ints = [
         { ptr: arrays.lifePtr, value: Math.max(1, Math.round(grant.durability)) },
         { ptr: arrays.effectTypePtr, value: modifierHash(grant.modifier) },
-        { ptr: arrays.effectValuePtr, value: grant.modifier === 'None' ? EMPTY_SLOT : Math.max(0, Math.round(grant.modifierValue)) },
+        // item ocupado sem modificador usa 0; -1 e so pra slot vazio
+        { ptr: arrays.effectValuePtr, value: grant.modifier === 'None' ? 0 : Math.max(0, Math.round(grant.modifierValue)) },
       ]
       if (arrays.combinedLifePtr !== undefined) ints.push({ ptr: arrays.combinedLifePtr, value: 0 })
       if (arrays.extraLifePtr !== undefined) ints.push({ ptr: arrays.extraLifePtr, value: 0 })

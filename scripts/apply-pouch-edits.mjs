@@ -10,7 +10,9 @@ const META = 0xa3db7114;
 
 // --- o que aplicar -----------------------------------------------------
 /** enche TODOS os slots livres de escudo com Hylian Shield na durabilidade cheia */
-const SHIELD_FILL = { id: 'Weapon_Shield_030', durability: 800 };
+/* DurabilityUpPlus com valor 8: e exatamente o que o melhor escudo do save ja
+   tem (os dele variam 6-8), entao fica dentro da faixa que o jogo usa. */
+const SHIELD_FILL = { id: 'Weapon_Shield_030', durability: 800, modifier: 'DurabilityUpPlus', modifierValue: 8 };
 /** único tipo de flecha do jogo; 999 é o teto de pilha */
 const ARROW_TARGET = 999;
 /**
@@ -119,8 +121,8 @@ if (want('shields')) {
       if (!dry) {
         writeName(nP, i, SHIELD_FILL.id);
         setU32(lP, i, SHIELD_FILL.durability);
-        setU32(eP, i, murmur3('None'));
-        setU32(vP, i, 0xffffffff); // sem modificador = -1, como nos itens do jogo
+        setU32(eP, i, murmur3(SHIELD_FILL.modifier));
+        setU32(vP, i, SHIELD_FILL.modifierValue);
         // Um escudo criado precisa ficar IDENTICO a um que o jogo criou: os
         // 7 ocupados deste save tem fuseName vazio e fuseLife/extraLife = 0.
         // Deixar -1 (sentinela de slot vazio) produz um item meio-criado.
@@ -130,7 +132,7 @@ if (want('shields')) {
       }
       added++;
     }
-    log.push(`escudos: ${added} Hylian Shield (dur ${SHIELD_FILL.durability}) — pouch ${cap}/${cap} desbloqueados (array tem ${physical} posições, mas só ${unlocked} valem)`);
+    log.push(`escudos: ${added} Hylian Shield (dur ${SHIELD_FILL.durability}, ${SHIELD_FILL.modifier} +${SHIELD_FILL.modifierValue}) — pouch ${cap}/${cap} desbloqueados (array tem ${physical} posições, mas só ${unlocked} valem)`);
   }
 }
 
