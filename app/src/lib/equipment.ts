@@ -34,6 +34,22 @@ const PREFIX: Record<EquipCategory, string> = {
   shields: 'Pouch.Shield',
 }
 
+/**
+ * `Pouch.*.ValidNum`: quantos slots o jogador REALMENTE desbloqueou (as
+ * ampliações com semente de Korok). O array tem sempre mais posições físicas
+ * que isso — escudo, por exemplo, tem 40 posições pra um limite de 20.
+ *
+ * Escrever além do ValidNum corrompe o save: o jogo trata o arquivo como
+ * inválido e abre na tela inicial, como se fosse um jogo novo. O dump de
+ * hashes da comunidade só traz o hash desses campos, não o nome exato, por
+ * isso são números crus.
+ */
+const VALID_NUM_HASH: Record<EquipCategory, number> = {
+  bows: 0xc61785c2,
+  weapons: 0xd7a3f6ba,
+  shields: 0x05271e7d,
+}
+
 export const modifierHash = (name: string) => murmur3(name)
 
 /** hash → nome, pra decodificar o que já está no save */
@@ -95,7 +111,10 @@ export function equipArrays(values: Map<number, number>, cat: EquipCategory, buf
     return null
   }
   const dv = new DataView(buffer)
-  return { namePtr, lifePtr, effectTypePtr, effectValuePtr, capacity: dv.getUint32(namePtr, true) }
+  const physical = dv.getUint32(namePtr, true)
+  const validPtr = values.get(VALID_NUM_HASH[cat])
+  const unlocked = validPtr === undefined ? physical : dv.getUint32(validPtr + 4, true)
+  return { namePtr, lifePtr, effectTypePtr, effectValuePtr, capacity: Math.min(physical, unlocked) }
 }
 
 /** lê o pouch da categoria a partir do save da sessão */

@@ -89,8 +89,13 @@ const setU32 = (ptr, i, v) => dv.setUint32(ptr + 4 + i * 4, v >>> 0, true);
 
 const log = [];
 
-// ---- 1) escudos: enche todo slot livre ----
+// ---- 1) escudos: enche todo slot livre DENTRO da capacidade desbloqueada ----
 {
+  // CRÍTICO: o array tem 40 posições físicas, mas o jogo só considera válidas
+  // as primeiras `Pouch.Shield.ValidNum` (as que você desbloqueou com os
+  // Korok seeds). Escrever além disso corrompe o save — o jogo trata o arquivo
+  // como inválido e cai na tela inicial. Aprendido do jeito ruim.
+  const validPtr = values.get(0x05271e7d); // Pouch.Shield.ValidNum
   const nP = values.get(murmur3('Pouch.Shield.Content.Name'));
   const lP = values.get(murmur3('Pouch.Shield.Content.Life'));
   const eP = values.get(murmur3('Pouch.Shield.Content.Effect.Type'));
@@ -98,7 +103,9 @@ const log = [];
   if (nP === undefined) {
     log.push('escudos: arrays não encontrados');
   } else {
-    const cap = dv.getUint32(nP, true);
+    const physical = dv.getUint32(nP, true);
+    const unlocked = validPtr === undefined ? physical : dv.getUint32(validPtr + 4, true);
+    const cap = Math.min(physical, unlocked);
     let added = 0;
     for (let i = 0; i < cap; i++) {
       if (readName(nP, i)) continue;
@@ -110,7 +117,7 @@ const log = [];
       }
       added++;
     }
-    log.push(`escudos: ${added} Hylian Shield (dur ${SHIELD_FILL.durability}) em slots vazios — pouch agora cheio (${cap}/${cap})`);
+    log.push(`escudos: ${added} Hylian Shield (dur ${SHIELD_FILL.durability}) — pouch ${cap}/${cap} desbloqueados (array tem ${physical} posições, mas só ${unlocked} valem)`);
   }
 }
 

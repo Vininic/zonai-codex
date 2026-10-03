@@ -10,6 +10,8 @@ import { allArmorLabels, buildArmorPlan, type ArmorPlan } from '../lib/armorPlan
 import { buildRegionPlan, type RegionPlan } from '../lib/regionPlanner'
 import { REGIONS, regionById } from '../lib/regions'
 import { categoryMeta } from '../lib/categoryMeta'
+import { itemLabel } from '../lib/itemLabel'
+import { buildReportHtml } from '../lib/reportHtml'
 import { computeProgress } from '../lib/useDataset'
 import { PlanFlow, type FlowStepDef } from '../components/PlanFlow'
 import { RouteArtifact } from '../components/RouteArtifact'
@@ -59,6 +61,9 @@ interface ReportPlan {
   layer: string
   steps: RouteStep[]
   pendingTotal: number
+  /** tudo que falta nas categorias com mapa, por grupo — a rota é só uma
+   *  viagem (~24 paradas), mas o relatório tem que listar o resto também */
+  mapPending: { categoryId: string; items: { label: string; x: number; z: number; layer: string }[] }[]
 }
 type Plan = CollectPlan | ArmorPlanMsg | SummaryPlan | RegionPlanMsg | ChecklistPlan | ReportPlan
 
@@ -194,7 +199,9 @@ export function Companion() {
     const pending = stat.items
       .filter((item) => !m[item.id] && !sv[item.id])
       .map((item) => ({ label: item.label ?? item.id, hint: hintOf(item as unknown as Record<string, unknown>) }))
-    return { type: 'checklist', statId, pending: pending.slice(0, 40), pendingTotal: pending.length, total: stat.items.length }
+    // guarda a lista inteira: o cartao corta na hora de desenhar, mas o
+    // relatorio baixado precisa de tudo — um report pela metade nao serve
+    return { type: 'checklist', statId, pending, pendingTotal: pending.length, total: stat.items.length }
   }
 
   /**
@@ -236,6 +243,18 @@ export function Companion() {
       ? optimizeRoute(data, manual, fromSave, { categories: new Set(categoryIds), layer, origin })
       : { stops: [] as RouteStep[] }
 
+    const mapPending = categoryIds.map((id) => {
+      const cat = data.categories.find((c) => c.id === id)
+      const m = manual[id] ?? {}
+      const sv = fromSave[id] ?? {}
+      return {
+        categoryId: id,
+        items: (cat?.items ?? [])
+          .filter((it) => !m[it.id] && !sv[it.id])
+          .map((it) => ({ label: itemLabel(it), x: it.x, z: it.z, layer: it.layer ?? 'surface' })),
+      }
+    })
+
     return {
       type: 'report',
       collects,
@@ -243,6 +262,7 @@ export function Companion() {
       routeCategoryIds: categoryIds,
       layer,
       steps: route.stops,
+      mapPending,
       pendingTotal: collects.reduce((n, c) => n + c.pendingTotal, 0) + checklists.reduce((n, c) => n + c.pendingTotal, 0),
     }
   }
@@ -629,29 +649,36 @@ function ReportCard({ plan, groupName }: { plan: ReportPlan; groupName: (id: str
   const navigate = useNavigate()
   const setRoute = useAppStore((s) => s.setRoute)
 
-  function downloadReport() {
-    const lines: string[] = ['# Zonai Codex — ' + t('companion.reportTitle'), '', '_' + new Date().toLocaleString() + '_', '']
-    if (plan.steps.length) {
-      lines.push('## ' + t('companion.reportRoute', { layer: plan.layer }), '')
-      plan.steps.forEach((s, i) => {
-        lines.push(`${i + 1}. ${s.label} — (${Math.round(s.x)}, ${Math.round(s.z)}) · ${groupName(s.groupId)}`)
-      })
-      lines.push('')
-    }
-    for (const c of plan.collects) {
-      lines.push(`## ${groupName(c.categoryId)} — ${c.pendingTotal} ${t('companion.pending')}`, '')
-    }
-    for (const c of plan.checklists) {
-      lines.push(`## ${groupName(c.statId)} — ${c.pendingTotal}/${c.total} ${t('companion.pending')}`, '')
-      for (const row of c.pending) lines.push(`- ${row.label}${row.hint ? ` — ${row.hint}` : ''}`)
-      if (c.pendingTotal > c.pending.length) lines.push(`- (+${c.pendingTotal - c.pending.length})`)
-      lines.push('')
-    }
-    const blob = new Blob([lines.join(String.fromCharCode(10))], { type: 'text/markdown;charset=utf-8' })
+  async function downloadReport() {
+    const html = await buildReportHtml({
+      title: t('companion.reportTitle'),
+      layer: plan.layer,
+      layerLabel: t(`map.layers.${plan.layer}`),
+      stops: plan.steps.map((s) => ({ label: s.label, x: s.x, z: s.z, groupId: s.groupId })),
+      mapPending: plan.mapPending.map((g) => ({
+        categoryId: g.categoryId,
+        label: groupName(g.categoryId),
+        items: g.items,
+      })),
+      checklists: plan.checklists.map((c) => ({
+        statId: c.statId,
+        label: groupName(c.statId),
+        total: c.total,
+        pending: c.pending,
+      })),
+      strings: {
+        route: t('route.title'),
+        pending: t('companion.pending'),
+        remaining: t('companion.pending'),
+        noRoute: t('companion.checklistNoRoute'),
+        generated: t('companion.reportTitle'),
+      },
+    })
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'zonai-codex-report.md'
+    a.download = 'zonai-codex-report.html'
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -876,14 +903,15 @@ function SummaryCard({ plan }: { plan: SummaryPlan }) {
 function ChecklistCard({ plan }: { plan: ChecklistPlan }) {
   const { t } = useTranslation()
   const meta = categoryMeta(plan.statId)
-  const hidden = plan.pendingTotal - plan.pending.length
+  const shown = plan.pending.slice(0, 40)
+  const hidden = plan.pendingTotal - shown.length
   // grupo completo: a mensagem de texto já diz tudo, o cartão vazio só polui
   if (plan.pending.length === 0) return null
   return (
     <div className="panel space-y-2 p-3">
       <p className="text-[10px] uppercase tracking-widest text-ink-faint">{t('companion.checklistNoRoute')}</p>
       <ul className="space-y-1">
-        {plan.pending.map((row) => (
+        {shown.map((row) => (
           <li key={row.label} className="flex items-baseline gap-2 text-xs">
             <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: meta.color }} />
             <span className="min-w-0">

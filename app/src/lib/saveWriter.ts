@@ -296,8 +296,11 @@ export function buildEditPlan(
       claimedByCat.set(grant.category, used)
 
       const names = readString64Raw(buffer, arrays.namePtr)
+      // só até arrays.capacity: esse é o ValidNum (slots realmente
+      // desbloqueados), não o tamanho físico do array. Gravar além dele
+      // corrompe o save — o jogo abre na tela inicial. Ver equipment.ts.
       let idx = -1
-      for (let i = 0; i < names.length; i++) {
+      for (let i = 0; i < Math.min(names.length, arrays.capacity); i++) {
         if (names[i] === '' && !used.has(i)) {
           idx = i
           break
