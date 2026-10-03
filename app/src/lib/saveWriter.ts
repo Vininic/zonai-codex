@@ -46,6 +46,9 @@ export function computeStaged(data: CompletionData, manual: Progress, fromSave: 
 
 export type { PlayerEdits } from '../store/appStore'
 
+/** único tipo de flecha do jogo */
+export const ARROW_ACTOR = 'NormalArrow'
+
 const H_RUPEES = murmur3('PlayerStatus.CurrentRupee')
 const H_MAX_LIFE = murmur3('PlayerStatus.MaxLife')
 const H_MAX_STAMINA = murmur3('PlayerStatus.MaxStamina')
@@ -217,6 +220,7 @@ export function buildEditPlan(
   equipmentDeletes: string[] = [],
   horseEdits: Record<number, HorseEdit> = {},
   horseDeletes: number[] = [],
+  arrowQty: number | null = null,
 ): EditPlan {
   const writes = new Map<number, number>()
   const arrayWrites: ArrayWrite[] = []
@@ -426,6 +430,30 @@ export function buildEditPlan(
           wstrings: wnamePtr !== undefined ? [{ ptr: wnamePtr, value: '' }] : [],
           floats: bondPtr !== undefined ? [{ ptr: bondPtr, value: 0 }] : [],
           bits: bondCheckedPtr !== undefined ? [{ ptr: bondCheckedPtr, value: false }] : [],
+        })
+        itemCount++
+      }
+    }
+  }
+
+  // flechas: Pouch.Arrow é só nome + StockNum, e em TOTK só existe um tipo
+  // (NormalArrow) — então o "editor de flechas" é de fato um campo de
+  // quantidade. Se o slot ainda não existir no pouch, cria no primeiro vazio.
+  if (buffer && values && arrowQty !== null) {
+    const namesPtr = values.get(murmur3('Pouch.Arrow.Content.Name'))
+    const stockPtr = values.get(murmur3('Pouch.Arrow.Content.StockNum'))
+    if (namesPtr !== undefined && stockPtr !== undefined) {
+      const names = readString64Raw(buffer, namesPtr)
+      let idx = names.indexOf(ARROW_ACTOR)
+      if (idx === -1) idx = findEmptySlot(names, claimed)
+      if (idx !== -1) {
+        claimed.add(idx)
+        arrayWrites.push({
+          namesPtr,
+          index: idx,
+          actorName: ARROW_ACTOR,
+          stockPtr,
+          stockValue: Math.max(0, Math.min(999, Math.round(arrowQty))),
         })
         itemCount++
       }

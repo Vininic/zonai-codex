@@ -132,6 +132,8 @@ interface AppState {
   horseEdits: Record<number, HorseEdit>
   /** índices de slot de cavalo a esvaziar */
   horseDeletes: number[]
+  /** quantidade de flechas (Pouch.Arrow); null = não mexer */
+  arrowQty: number | null
 
   setLang: (lang: 'en' | 'pt') => void
   setTheme: (theme: 'dark' | 'light') => void
@@ -162,6 +164,7 @@ interface AppState {
   setHorseEdit: (index: number, patch: HorseEdit) => void
   clearHorseEdit: (index: number) => void
   toggleHorseDelete: (index: number) => void
+  setArrowQty: (qty: number | null) => void
   clearPouchEdits: () => void
   /** restaura um backup JSON exportado */
   restore: (snapshot: Partial<Pick<AppState, 'manual' | 'fromSave' | 'player' | 'saveMeta' | 'excluded'>>) => void
@@ -195,6 +198,7 @@ export const useAppStore = create<AppState>()(
       equipmentDeletes: [],
       horseEdits: {},
       horseDeletes: [],
+      arrowQty: null,
 
       setLang: (lang) => set({ lang }),
       setTheme: (theme) => set({ theme }),
@@ -208,8 +212,32 @@ export const useAppStore = create<AppState>()(
           else group[itemId] = 1
           return { manual: { ...s.manual, [groupId]: group } }
         }),
+      /**
+       * Importar um save o torna o novo baseline — e isso OBRIGA a jogar fora as
+       * edições staged. Elas foram feitas contra o arquivo anterior, e as de
+       * pouch são indexadas por POSIÇÃO de slot (`bows:3`, cavalo 5): no arquivo
+       * novo esses índices são outros itens, então um "apagar" pendente removeria
+       * a arma errada. Também evita reaplicar tudo de novo no save que o próprio
+       * editor acabou de gravar (o export reimporta) e duplicar os grants.
+       * As marcas do tracker (`manual`) são por id de item, não por índice, e
+       * continuam valendo.
+       */
       setSaveResult: (fromSave, player, meta, diff) =>
-        set({ fromSave, player, saveMeta: meta, lastDiff: diff }),
+        set({
+          fromSave,
+          player,
+          saveMeta: meta,
+          lastDiff: diff,
+          materialQty: {},
+          playerEdits: {},
+          equipmentGrants: [],
+          equipmentEdits: {},
+          equipmentDeletes: [],
+          horseEdits: {},
+          horseDeletes: [],
+          grantEpona: false,
+          arrowQty: null,
+        }),
       clearSave: () => set({ fromSave: {}, player: null, saveMeta: null, lastDiff: null }),
       toggleExcluded: (groupId) =>
         set((s) => {
@@ -269,7 +297,9 @@ export const useAppStore = create<AppState>()(
             ? s.horseDeletes.filter((i) => i !== index)
             : [...s.horseDeletes, index],
         })),
-      clearPouchEdits: () => set({ equipmentEdits: {}, equipmentDeletes: [], horseEdits: {}, horseDeletes: [], equipmentGrants: [], grantEpona: false }),
+      setArrowQty: (qty) => set({ arrowQty: qty }),
+      clearPouchEdits: () =>
+        set({ equipmentEdits: {}, equipmentDeletes: [], horseEdits: {}, horseDeletes: [], equipmentGrants: [], grantEpona: false, arrowQty: null }),
       restore: (snapshot) => set(snapshot),
     }),
     { name: 'zonai-codex' },

@@ -150,9 +150,10 @@ export function EquipmentTab({ category, hasSession }: { category: EquipCategory
           <AddForm
             category={category}
             catalog={catalog}
+            freeSlots={Math.max(1, freeAfterGrants)}
             onCancel={() => setAdding(false)}
-            onAdd={(g) => {
-              addGrant(g)
+            onAdd={(g, qty) => {
+              for (let i = 0; i < qty; i++) addGrant(g)
               setAdding(false)
             }}
           />
@@ -304,17 +305,22 @@ function AddForm({
   catalog,
   onAdd,
   onCancel,
+  freeSlots,
 }: {
   category: EquipCategory
   catalog: EquipCatalog
-  onAdd: (g: { category: EquipCategory; id: string; durability: number; modifier: string; modifierValue: number }) => void
+  onAdd: (g: { category: EquipCategory; id: string; durability: number; modifier: string; modifierValue: number }, qty: number) => void
   onCancel: () => void
+  freeSlots: number
 }) {
   const { t } = useTranslation()
   const items = catalog[category]
   const [id, setId] = useState(items[0]?.id ?? '')
   const [modifier, setModifier] = useState('None')
   const [modifierValue, setModifierValue] = useState(10)
+  // encher o pouch de Hylian Shield um clique por vez era insuportável;
+  // `qty` repete o mesmo item até o limite de slots livres
+  const [qty, setQty] = useState(1)
   const chosen = items.find((i) => i.id === id)
   const [durability, setDurability] = useState<number | null>(null)
   const effectiveDur = durability ?? chosen?.durability ?? 70
@@ -380,12 +386,24 @@ function AddForm({
         </label>
       )}
 
+      <label className="block text-[10px] uppercase tracking-widest text-ink-mute">
+        {t('inventory.equipQty', { max: freeSlots })}
+        <input
+          type="number"
+          min={1}
+          max={freeSlots}
+          value={qty}
+          onChange={(e) => setQty(Math.max(1, Math.min(freeSlots, Number(e.target.value) || 1)))}
+          className={`${field} font-mono`}
+        />
+      </label>
+
       <div className="flex gap-2 pt-1">
         <button
-          onClick={() => onAdd({ category, id, durability: effectiveDur, modifier, modifierValue })}
+          onClick={() => onAdd({ category, id, durability: effectiveDur, modifier, modifierValue }, qty)}
           className="btn-jade flex-1 text-center"
         >
-          {t('inventory.grant')}
+          {qty > 1 ? t('inventory.grantMany', { count: qty }) : t('inventory.grant')}
         </button>
         <button onClick={onCancel} className="panel px-3 py-2 text-xs text-ink-mute hover:text-gloom">
           {t('common.close')}

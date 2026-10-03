@@ -9,15 +9,16 @@ import { TypeIcon, type IconKind } from '../components/TypeIcon'
 import { ItemIcon } from '../components/ItemIcon'
 import { EquipmentTab } from '../components/EquipmentTab'
 import { HorsesTab } from '../components/HorsesTab'
+import { ArrowsTab } from '../components/ArrowsTab'
 import type { EquipCategory } from '../lib/equipment'
 import type { MaterialBucket } from '../lib/materialIcon'
 
-type Tab = 'materials' | 'key_items' | 'armor' | 'fabrics' | 'fabrics_amiibo' | 'bows' | 'weapons' | 'shields' | 'horses'
+type Tab = 'materials' | 'key_items' | 'armor' | 'fabrics' | 'fabrics_amiibo' | 'bows' | 'weapons' | 'shields' | 'horses' | 'arrows'
 
 /** abas de equipamento têm dados próprios (durabilidade/modificador) e UI própria */
 const EQUIP_TABS = ['bows', 'weapons', 'shields'] as const
 const isEquipTab = (t: Tab): t is EquipCategory => (EQUIP_TABS as readonly string[]).includes(t)
-const isCustomTab = (t: Tab) => isEquipTab(t) || t === 'horses'
+const isCustomTab = (t: Tab) => isEquipTab(t) || t === 'horses' || t === 'arrows'
 
 const TAB_ICON: Record<Tab, IconKind> = {
   materials: 'fruit',
@@ -29,6 +30,7 @@ const TAB_ICON: Record<Tab, IconKind> = {
   weapons: 'armor',
   shields: 'armor',
   horses: 'horse',
+  arrows: 'misc',
 }
 
 /**
@@ -151,6 +153,7 @@ export function Inventory() {
       weapons: [],
       shields: [],
       horses: [],
+      arrows: [],
     }),
     [materials, keyItems, armor, fabrics, amiibo],
   )
@@ -165,7 +168,7 @@ export function Inventory() {
 
   const selected = slots.find((s) => s.id === selectedId) ?? slots[0] ?? null
 
-  const TABS: Tab[] = ['materials', 'key_items', 'armor', 'fabrics', 'fabrics_amiibo', 'bows', 'weapons', 'shields', 'horses']
+  const TABS: Tab[] = ['materials', 'key_items', 'armor', 'fabrics', 'fabrics_amiibo', 'bows', 'weapons', 'shields', 'horses', 'arrows']
   const tabLabel = (tb: Tab): string => {
     if (tb === 'fabrics' || tb === 'fabrics_amiibo') {
       const key = `groups.${tb}`
@@ -223,6 +226,7 @@ export function Inventory() {
 
       {isEquipTab(tab) && <EquipmentTab category={tab} hasSession={hasSession} />}
       {tab === 'horses' && <HorsesTab hasSession={hasSession} />}
+      {tab === 'arrows' && <ArrowsTab hasSession={hasSession} />}
 
       {!isCustomTab(tab) && (
       <>

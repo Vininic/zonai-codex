@@ -23,6 +23,8 @@ export function SavePage() {
   const lastDiff = useAppStore((s) => s.lastDiff)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  /** resultado da escolha automática quando o usuário importa vários slots */
+  const [pickedFrom, setPickedFrom] = useState<{ chosen: string; hours: number; total: number } | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const jsonRef = useRef<HTMLInputElement>(null)
@@ -63,9 +65,51 @@ export function SavePage() {
     }
   }
 
+  /**
+   * Aceita vários slots de uma vez. Ao extrair o save do Switch os 6 arquivos
+   * saem com a MESMA data, então a data do arquivo não diz qual é o atual — o
+   * tempo de jogo gravado dentro do save diz. Selecione slot_00..slot_05 e o
+   * app escolhe o de maior playtime, dizendo qual escolheu.
+   */
   async function onFile(files: FileList | null) {
-    const file = files?.[0]
-    if (file) await importBuffer(await file.arrayBuffer(), file.name)
+    const list = files ? [...files] : []
+    if (list.length === 0) return
+    if (list.length === 1) {
+      setPickedFrom(null)
+      await importBuffer(await list[0].arrayBuffer(), list[0].name)
+      return
+    }
+
+    setBusy(true)
+    try {
+      const parsed: { name: string; buffer: ArrayBuffer; seconds: number }[] = []
+      for (const f of list) {
+        const buffer = await f.arrayBuffer()
+        try {
+          parsed.push({ name: f.name, buffer, seconds: parseSave(buffer).player.playTimeSeconds })
+        } catch {
+          /* arquivo que não é progress.sav entra na seleção sem atrapalhar */
+        }
+      }
+      if (parsed.length === 0) {
+        setError(t('save.invalid'))
+        return
+      }
+      parsed.sort((a, b) => b.seconds - a.seconds)
+      const best = parsed[0]
+      // o nome do arquivo é sempre "progress.sav"; o que distingue é a pasta,
+      // que o browser só entrega com webkitRelativePath
+      const labelOf = (f: File) => f.webkitRelativePath || f.name
+      const folder = list.find((f) => labelOf(f).endsWith(best.name))
+      setPickedFrom({
+        chosen: folder ? labelOf(folder) : best.name,
+        hours: Math.round(best.seconds / 360) / 10,
+        total: parsed.length,
+      })
+      await importBuffer(best.buffer, folder ? labelOf(folder) : best.name)
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function loadDemo() {
@@ -125,7 +169,7 @@ export function SavePage() {
           <section className="panel space-y-3 p-4">
             <h3 className="font-display text-sm uppercase tracking-widest text-ink-mute">{t('save.importTitle')}</h3>
             <p className="text-sm text-ink-mute">{t('save.importHint')}</p>
-            <input ref={fileRef} type="file" accept=".sav" className="hidden" onChange={(e) => onFile(e.target.files)} />
+            <input ref={fileRef} type="file" accept=".sav" multiple className="hidden" onChange={(e) => onFile(e.target.files)} />
             <div className="flex flex-col gap-2">
               <button onClick={() => fileRef.current?.click()} disabled={busy} className="btn-jade flex items-center justify-center gap-2 disabled:opacity-60">
                 {busy && <Spinner />}
@@ -136,6 +180,11 @@ export function SavePage() {
                 {t('save.loadDemo')}
               </button>
             </div>
+            {pickedFrom && (
+              <p className="text-xs" style={{ color: 'var(--color-jade)' }}>
+                {t('save.pickedNewest', pickedFrom)}
+              </p>
+            )}
             {error && <p className="text-sm" style={{ color: 'var(--color-gloom)' }}>{error}</p>}
           </section>
 
@@ -210,8 +259,13 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
   const horseEdits = useAppStore((s) => s.horseEdits)
   const horseDeletes = useAppStore((s) => s.horseDeletes)
   const clearPouchEdits = useAppStore((s) => s.clearPouchEdits)
+  const arrowQty = useAppStore((s) => s.arrowQty)
   const pouchEditCount =
-    Object.keys(equipmentEdits).length + equipmentDeletes.length + Object.keys(horseEdits).length + horseDeletes.length
+    Object.keys(equipmentEdits).length +
+    equipmentDeletes.length +
+    Object.keys(horseEdits).length +
+    horseDeletes.length +
+    (arrowQty !== null ? 1 : 0)
 
   const session = getSessionSave()
   const parsedSession = useMemo(() => (session ? parseSave(session.buffer) : null), [session])
@@ -230,13 +284,13 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
 
   const plan = useMemo(
     () =>
-      buildEditPlan(data, staged, selected, edits, player, session?.buffer ?? null, parsedSession?.values ?? null, materialQtyEdits, equipmentGrants, grantEpona, equipmentEdits, equipmentDeletes, horseEdits, horseDeletes),
-    [data, staged, selected, edits, player, session, parsedSession, materialQtyEdits, equipmentGrants, grantEpona, equipmentEdits, equipmentDeletes, horseEdits, horseDeletes],
+      buildEditPlan(data, staged, selected, edits, player, session?.buffer ?? null, parsedSession?.values ?? null, materialQtyEdits, equipmentGrants, grantEpona, equipmentEdits, equipmentDeletes, horseEdits, horseDeletes, arrowQty),
+    [data, staged, selected, edits, player, session, parsedSession, materialQtyEdits, equipmentGrants, grantEpona, equipmentEdits, equipmentDeletes, horseEdits, horseDeletes, arrowQty],
   )
   const itemOnlyPlan = useMemo(
     () =>
-      buildEditPlan(data, staged, selected, {}, null, session?.buffer ?? null, parsedSession?.values ?? null, materialQtyEdits, equipmentGrants, grantEpona, equipmentEdits, equipmentDeletes, horseEdits, horseDeletes),
-    [data, staged, selected, session, parsedSession, materialQtyEdits, equipmentGrants, grantEpona, equipmentEdits, equipmentDeletes, horseEdits, horseDeletes],
+      buildEditPlan(data, staged, selected, {}, null, session?.buffer ?? null, parsedSession?.values ?? null, materialQtyEdits, equipmentGrants, grantEpona, equipmentEdits, equipmentDeletes, horseEdits, horseDeletes, arrowQty),
+    [data, staged, selected, session, parsedSession, materialQtyEdits, equipmentGrants, grantEpona, equipmentEdits, equipmentDeletes, horseEdits, horseDeletes, arrowQty],
   )
   const playerChanges = plan.writes.size - itemOnlyPlan.writes.size
 
@@ -393,7 +447,14 @@ function EditorSection({ onExported }: { onExported: (buffer: ArrayBuffer, fileN
           )}
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
-            <button onClick={exportEdited} disabled={plan.writes.size === 0} className="btn-jade disabled:opacity-40">
+            {/* `writes` é só a tabela escalar; todo o resto do editor (equipamento,
+                cavalos, Epona, quantidade de material) vive em `arrayWrites`. Olhar
+                só pro primeiro deixava o botão morto pra quem só mexeu no pouch. */}
+            <button
+              onClick={exportEdited}
+              disabled={plan.writes.size === 0 && plan.arrayWrites.length === 0}
+              className="btn-jade disabled:opacity-40"
+            >
               {t('save.writeExport')}
             </button>
             <button onClick={downloadBackup} className="panel px-3 py-2 text-xs text-ink-mute hover:text-jade">

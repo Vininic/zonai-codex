@@ -8,9 +8,11 @@ import { REGIONS } from './regions'
 
 export type Intent =
   | { kind: 'armor'; label: string }
-  | { kind: 'collect'; categoryId: string }
+  | { kind: 'collect'; categoryIds: string[] }
   | { kind: 'region'; regionId: string }
-  | { kind: 'checklist'; statId: string }
+  | { kind: 'checklist'; statIds: string[] }
+  /** pedido que mistura grupos com e sem mapa ("poços, placas e tecidos") */
+  | { kind: 'report'; categoryIds: string[]; statIds: string[] }
   | { kind: 'summary' }
   | { kind: 'unknown' }
 
@@ -96,18 +98,24 @@ export function parseIntentLocal(text: string, armorLabels: string[]): Intent {
   }
   if (best && (armorish || best.score === 1)) return { kind: 'armor', label: best.label }
 
-  // aliases mais específicos (longos) primeiro: "shrine chest" antes de "shrine"
+  // aliases mais específicos (longos) primeiro: "shrine chest" antes de "shrine".
+  // Coleta TODOS os grupos citados, não só o primeiro — "poços, placas do
+  // Addison e localidades" é um pedido só, com três grupos.
   const flat: { alias: string; categoryId: string }[] = []
   for (const [categoryId, aliases] of Object.entries(CATEGORY_ALIASES))
     for (const alias of aliases) flat.push({ alias: norm(alias), categoryId })
   flat.sort((a, b) => b.alias.length - a.alias.length)
-  let categoryHit: string | null = null
+  const categoryHits: string[] = []
+  let consumed = q
   for (const { alias, categoryId } of flat) {
-    if (q.includes(alias)) {
-      categoryHit = categoryId
-      break
+    if (categoryHits.includes(categoryId)) continue
+    if (consumed.includes(alias)) {
+      categoryHits.push(categoryId)
+      // remove o trecho casado pra um alias curto não re-casar dentro de outro
+      consumed = consumed.split(alias).join(' ')
     }
   }
+  const categoryHit = categoryHits[0] ?? null
 
   // região: "limpar Hebra", "clear Gerudo", "100% de Akkala"…
   let regionHit: string | null = null
@@ -119,22 +127,26 @@ export function parseIntentLocal(text: string, armorLabels: string[]): Intent {
   }
   const clearish = /(limpar|clear|completar|complete|fechar|finish|100|area|área|regiao|região|region|zona|zone|tudo)/.test(q)
 
-  // grupos sem coordenada: mesma varredura por alias, mais longo primeiro
+  // grupos sem coordenada: mesma varredura, também acumulando todos
   const statFlat: { alias: string; statId: string }[] = []
   for (const [statId, aliases] of Object.entries(STAT_ALIASES))
     for (const alias of aliases) statFlat.push({ alias: norm(alias), statId })
   statFlat.sort((a, b) => b.alias.length - a.alias.length)
-  let statHit: string | null = null
+  const statHits: string[] = []
+  let consumedStats = consumed
   for (const { alias, statId } of statFlat) {
-    if (q.includes(alias)) {
-      statHit = statId
-      break
+    if (statHits.includes(statId)) continue
+    if (consumedStats.includes(alias)) {
+      statHits.push(statId)
+      consumedStats = consumedStats.split(alias).join(' ')
     }
   }
 
   if (regionHit && (clearish || !categoryHit)) return { kind: 'region', regionId: regionHit }
-  if (categoryHit) return { kind: 'collect', categoryId: categoryHit }
-  if (statHit) return { kind: 'checklist', statId: statHit }
+  // pedido misto: rota pro que tem mapa + checklist pro que não tem
+  if (categoryHits.length && statHits.length) return { kind: 'report', categoryIds: categoryHits, statIds: statHits }
+  if (categoryHits.length) return { kind: 'collect', categoryIds: categoryHits }
+  if (statHits.length) return { kind: 'checklist', statIds: statHits }
   return { kind: 'unknown' }
 }
 
@@ -153,16 +165,28 @@ export async function parseIntentLLM(
     `Regions: ${regionIds.join(', ')}`,
     `Checklist groups (no map coordinates — list-only): ${statIds.join(', ')}`,
     `Armor labels: ${armorLabels.join(' | ')}`,
-    'Schema: {"kind":"armor","label":"<exact armor label>"} OR {"kind":"collect","categoryId":"<exact category id>"} OR {"kind":"region","regionId":"<exact region id>"} OR {"kind":"checklist","statId":"<exact checklist group id>"} OR {"kind":"summary"} OR {"kind":"unknown"}',
+    'Schema: {"kind":"armor","label":"<exact armor label>"} OR {"kind":"collect","categoryIds":["<category id>",...]} OR {"kind":"region","regionId":"<exact region id>"} OR {"kind":"checklist","statIds":["<checklist group id>",...]} OR {"kind":"report","categoryIds":[...],"statIds":[...]} OR {"kind":"summary"} OR {"kind":"unknown"}',
+    'Include EVERY group the user mentions, not just the first one.',
     `Request: ${text}`,
   ].join('\n')
   try {
     const raw = await aiComplete(cfg, prompt, { json: true, temperature: 0 })
     const parsed = JSON.parse(raw.replace(/^```(json)?|```$/g, '').trim())
     if (parsed.kind === 'armor' && armorLabels.includes(parsed.label)) return parsed
-    if (parsed.kind === 'collect' && categoryIds.includes(parsed.categoryId)) return parsed
+    if (parsed.kind === 'collect' && Array.isArray(parsed.categoryIds)) {
+      const ids = parsed.categoryIds.filter((c: string) => categoryIds.includes(c))
+      if (ids.length) return { kind: 'collect', categoryIds: ids }
+    }
     if (parsed.kind === 'region' && regionIds.includes(parsed.regionId)) return parsed
-    if (parsed.kind === 'checklist' && statIds.includes(parsed.statId)) return parsed
+    if (parsed.kind === 'checklist' && Array.isArray(parsed.statIds)) {
+      const ids = parsed.statIds.filter((c: string) => statIds.includes(c))
+      if (ids.length) return { kind: 'checklist', statIds: ids }
+    }
+    if (parsed.kind === 'report') {
+      const cids = (parsed.categoryIds ?? []).filter((c: string) => categoryIds.includes(c))
+      const sids = (parsed.statIds ?? []).filter((c: string) => statIds.includes(c))
+      if (cids.length || sids.length) return { kind: 'report', categoryIds: cids, statIds: sids }
+    }
     if (parsed.kind === 'summary') return parsed
   } catch {
     /* intent inválida vira unknown */

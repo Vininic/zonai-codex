@@ -38,6 +38,9 @@ export function MapPage() {
   const manual = useAppStore((s) => s.manual)
   const fromSave = useAppStore((s) => s.fromSave)
   const route = useAppStore((s) => s.route)
+  /** 'legs' = quebra onde houve teleporte (honesto); 'all' = liga tudo na ordem
+   *  de visita; 'off' = só os números. */
+  const [routeLine, setRouteLine] = useState<'legs' | 'all' | 'off'>('legs')
   const player = useAppStore((s) => s.player)
   const collapsed = useAppStore((s) => s.sidebarCollapsed)
 
@@ -201,9 +204,20 @@ export function MapPage() {
     }
     if (current.length) segments.push(current)
 
-    for (const seg of segments) {
-      if (seg.length < 2) continue
-      L.polyline(seg, { color: '#d9b96a', weight: 2, dashArray: '6 6', opacity: 0.9 }).addTo(group)
+    // `legs` respeita o teleporte e quebra a linha; `all` liga tudo na ordem de
+    // visita. Quando quase toda parada começa uma perna, o modo honesto não
+    // desenha linha nenhuma e a rota vira pontos soltos — daí o toggle.
+    if (routeLine !== 'off') {
+      const toDraw = routeLine === 'all' ? [[...(segments.flat() as [number, number][])]] : segments
+      for (const seg of toDraw) {
+        if (seg.length < 2) continue
+        L.polyline(seg, {
+          color: '#d9b96a',
+          weight: 2,
+          dashArray: routeLine === 'all' ? undefined : '6 6',
+          opacity: 0.9,
+        }).addTo(group)
+      }
     }
     const latlngs = steps.map((s) => toLatLng(s.x, s.z))
     steps.forEach((s, i) => {
@@ -219,7 +233,7 @@ export function MapPage() {
         .addTo(group)
     })
     map.fitBounds(L.latLngBounds(latlngs).pad(0.2))
-  }, [route, player, layer])
+  }, [route, player, layer, routeLine])
 
   // sidebar recolhe/expande → leaflet precisa remedir o container
   useEffect(() => {
@@ -248,6 +262,16 @@ export function MapPage() {
         <button onClick={() => setHideDone((v) => !v)} className="px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide" style={chipStyle(hideDone)}>
           {t('map.hideDone')}
         </button>
+        {route && route.length > 1 && (
+          <button
+            onClick={() => setRouteLine((v) => (v === 'legs' ? 'all' : v === 'all' ? 'off' : 'legs'))}
+            className="px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide"
+            style={chipStyle(routeLine !== 'off')}
+            title={t('map.routeLineHint')}
+          >
+            {t(`map.routeLine.${routeLine}`)}
+          </button>
+        )}
       </div>
 
       {/* painel filtro+legenda */}

@@ -46,7 +46,21 @@ interface ChecklistPlan {
   pendingTotal: number
   total: number
 }
-type Plan = CollectPlan | ArmorPlanMsg | SummaryPlan | RegionPlanMsg | ChecklistPlan
+/**
+ * Pedido que junta vários grupos ("poços, placas do Addison e localidades").
+ * Antes só o primeiro grupo citado era atendido — os outros sumiam calados.
+ * Guarda tudo junto pra virar uma rota única no mapa e um relatório baixável.
+ */
+interface ReportPlan {
+  type: 'report'
+  collects: CollectPlan[]
+  checklists: ChecklistPlan[]
+  routeCategoryIds: string[]
+  layer: string
+  steps: RouteStep[]
+  pendingTotal: number
+}
+type Plan = CollectPlan | ArmorPlanMsg | SummaryPlan | RegionPlanMsg | ChecklistPlan | ReportPlan
 
 interface Msg {
   role: 'user' | 'purah'
@@ -183,6 +197,56 @@ export function Companion() {
     return { type: 'checklist', statId, pending: pending.slice(0, 40), pendingTotal: pending.length, total: stat.items.length }
   }
 
+  /**
+   * Junta vários grupos num pedido só: traça UMA rota cobrindo todas as
+   * categorias que têm coordenada (na camada com mais pendências) e anexa a
+   * checklist dos grupos que não têm.
+   */
+  function buildReportPlan(categoryIds: string[], statIds: string[]): ReportPlan {
+    const collects = categoryIds.map((id) => buildCollectPlan(id)).filter((p): p is CollectPlan => !!p)
+    const checklists = statIds.map((id) => buildChecklistPlan(id)).filter((p): p is ChecklistPlan => !!p)
+
+    // A camada é escolhida pela COBERTURA de grupos, não pelo volume bruto.
+    // "poços, placas e localidades" somava mais pendências nas Depths (só
+    // localidades existem lá), e a rota saía só com localidades — jogando fora
+    // dois dos três grupos pedidos. Vence a camada onde mais grupos têm algo
+    // pendente; volume só desempata.
+    const byLayer = new Map<string, { count: number; groups: Set<string> }>()
+    for (const id of categoryIds) {
+      const cat = data.categories.find((c) => c.id === id)
+      if (!cat) continue
+      const m = manual[id] ?? {}
+      const sv = fromSave[id] ?? {}
+      for (const item of cat.items) {
+        if (m[item.id] || sv[item.id]) continue
+        const l = item.layer ?? 'surface'
+        const entry = byLayer.get(l) ?? { count: 0, groups: new Set<string>() }
+        entry.count++
+        entry.groups.add(id)
+        byLayer.set(l, entry)
+      }
+    }
+    const layer =
+      [...byLayer.entries()].sort((a, b) =>
+        b[1].groups.size !== a[1].groups.size ? b[1].groups.size - a[1].groups.size : b[1].count - a[1].count,
+      )[0]?.[0] ?? 'surface'
+    const origin =
+      player?.position && player.position.layer === layer ? { x: player.position.x, z: player.position.z } : null
+    const route = categoryIds.length
+      ? optimizeRoute(data, manual, fromSave, { categories: new Set(categoryIds), layer, origin })
+      : { stops: [] as RouteStep[] }
+
+    return {
+      type: 'report',
+      collects,
+      checklists,
+      routeCategoryIds: categoryIds,
+      layer,
+      steps: route.stops,
+      pendingTotal: collects.reduce((n, c) => n + c.pendingTotal, 0) + checklists.reduce((n, c) => n + c.pendingTotal, 0),
+    }
+  }
+
   /** abre o painel de rota à direita do chat */
   function traceRoute(
     categoryIds: string[],
@@ -222,8 +286,8 @@ export function Companion() {
     let reply = ''
     let narrationContext = ''
 
-    if (intent.kind === 'collect') {
-      const p = buildCollectPlan(intent.categoryId)
+    if (intent.kind === 'collect' && intent.categoryIds.length === 1) {
+      const p = buildCollectPlan(intent.categoryIds[0])
       if (p) {
         plan = p
         reply =
@@ -232,6 +296,17 @@ export function Companion() {
             : t('companion.collectReply', { count: p.pendingTotal, name: groupName(p.categoryId), layer: t(`map.layers.${p.layer}`) })
         narrationContext = `Collect plan: ${p.pendingTotal} ${p.categoryId} pending. First stops: ${p.steps.map((st, i) => `${i + 1}. ${st.label} (${Math.round(st.x)},${Math.round(st.z)})`).join('; ')}`
       }
+    } else if (intent.kind === 'collect' || intent.kind === 'report') {
+      const cids = intent.kind === 'report' ? intent.categoryIds : intent.categoryIds
+      const sids = intent.kind === 'report' ? intent.statIds : []
+      const p = buildReportPlan(cids, sids)
+      plan = p
+      const names = [...p.collects.map((c) => groupName(c.categoryId)), ...p.checklists.map((c) => groupName(c.statId))]
+      reply =
+        p.pendingTotal === 0
+          ? t('companion.allDone', { name: names.join(', ') })
+          : t('companion.reportReply', { count: p.pendingTotal, names: names.join(', '), stops: p.steps.length })
+      narrationContext = `Combined report for ${names.join(', ')}: ${p.pendingTotal} pending; ${p.steps.length} mapped stops on ${p.layer}.`
     } else if (intent.kind === 'armor') {
       const p = buildArmorPlan(data, manual, fromSave, intent.label)
       if (p) {
@@ -255,8 +330,14 @@ export function Companion() {
             : t('companion.regionReply', { name: region.name, count: p.totalPending, steps: p.steps.length })
         narrationContext = `Region sweep of ${region.name}: ${p.totalPending} pending across ${p.steps.length} steps: ${p.steps.map((s) => `${s.categoryId} (${s.pendingTotal})`).join(', ')}`
       }
+    } else if (intent.kind === 'checklist' && intent.statIds.length > 1) {
+      const p = buildReportPlan([], intent.statIds)
+      plan = p
+      const names = p.checklists.map((c) => groupName(c.statId))
+      reply = t('companion.reportReply', { count: p.pendingTotal, names: names.join(', '), stops: 0 })
+      narrationContext = `Checklists for ${names.join(', ')}: ${p.pendingTotal} pending, no map coordinates.`
     } else if (intent.kind === 'checklist') {
-      const p = buildChecklistPlan(intent.statId)
+      const p = buildChecklistPlan(intent.statIds[0])
       if (p) {
         plan = p
         reply =
@@ -348,6 +429,7 @@ export function Companion() {
                   {m.plan?.type === 'armor' && <ArmorPlanCard plan={m.plan.plan} groupName={groupName} />}
                   {m.plan?.type === 'summary' && <SummaryCard plan={m.plan} />}
                   {m.plan?.type === 'checklist' && <ChecklistCard plan={m.plan} />}
+                  {m.plan?.type === 'report' && <ReportCard plan={m.plan} groupName={groupName} />}
                   {m.plan?.type === 'region' && (
                     <RegionPlanCard
                       plan={m.plan.plan}
@@ -534,6 +616,116 @@ function PurahFace({ size }: { size: number }) {
         style={{ objectPosition: '50% 12%', transform: 'scale(1.6)', transformOrigin: '50% 18%' }}
       />
     </span>
+  )
+}
+
+/**
+ * Pedido combinado: uma rota só cobrindo todas as categorias com mapa, as
+ * checklists dos grupos sem mapa, e o relatório em Markdown pra baixar — antes
+ * só dava pra printar a tela.
+ */
+function ReportCard({ plan, groupName }: { plan: ReportPlan; groupName: (id: string) => string }) {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const setRoute = useAppStore((s) => s.setRoute)
+
+  function downloadReport() {
+    const lines: string[] = ['# Zonai Codex — ' + t('companion.reportTitle'), '', '_' + new Date().toLocaleString() + '_', '']
+    if (plan.steps.length) {
+      lines.push('## ' + t('companion.reportRoute', { layer: plan.layer }), '')
+      plan.steps.forEach((s, i) => {
+        lines.push(`${i + 1}. ${s.label} — (${Math.round(s.x)}, ${Math.round(s.z)}) · ${groupName(s.groupId)}`)
+      })
+      lines.push('')
+    }
+    for (const c of plan.collects) {
+      lines.push(`## ${groupName(c.categoryId)} — ${c.pendingTotal} ${t('companion.pending')}`, '')
+    }
+    for (const c of plan.checklists) {
+      lines.push(`## ${groupName(c.statId)} — ${c.pendingTotal}/${c.total} ${t('companion.pending')}`, '')
+      for (const row of c.pending) lines.push(`- ${row.label}${row.hint ? ` — ${row.hint}` : ''}`)
+      if (c.pendingTotal > c.pending.length) lines.push(`- (+${c.pendingTotal - c.pending.length})`)
+      lines.push('')
+    }
+    const blob = new Blob([lines.join(String.fromCharCode(10))], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'zonai-codex-report.md'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <div className="panel space-y-3 p-3">
+      {plan.steps.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[10px] uppercase tracking-widest text-ink-faint">
+            {t('companion.reportRoute', { layer: plan.layer })} · {plan.steps.length}
+          </p>
+          <ol className="space-y-1">
+            {plan.steps.slice(0, 12).map((s, i) => {
+              const meta = categoryMeta(s.groupId)
+              return (
+                <li key={`${s.groupId}-${s.itemId}`} className="flex items-center gap-2.5 text-xs">
+                  <span
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-mono text-[10px]"
+                    style={{ background: meta.color, color: 'var(--color-abyss)' }}
+                  >
+                    {i + 1}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-ink-mute">{s.label}</span>
+                  <span className="shrink-0 font-mono text-[10px] text-ink-faint">
+                    ({Math.round(s.x)}, {Math.round(s.z)})
+                  </span>
+                </li>
+              )
+            })}
+          </ol>
+          {plan.steps.length > 12 && (
+            <p className="text-[11px] text-ink-faint">{t('companion.checklistMore', { count: plan.steps.length - 12 })}</p>
+          )}
+        </div>
+      )}
+
+      {plan.checklists.map((c) => (
+        <div key={c.statId} className="space-y-1">
+          <p className="text-[10px] uppercase tracking-widest text-ink-faint">
+            {groupName(c.statId)} · {c.pendingTotal}/{c.total}
+          </p>
+          <ul className="space-y-1">
+            {c.pending.slice(0, 10).map((row) => (
+              <li key={row.label} className="text-xs">
+                <span className="text-ink">{row.label}</span>
+                {row.hint && <span className="text-ink-faint"> — {row.hint}</span>}
+              </li>
+            ))}
+          </ul>
+          {c.pendingTotal > Math.min(10, c.pending.length) && (
+            <p className="text-[11px] text-ink-faint">
+              {t('companion.checklistMore', { count: c.pendingTotal - Math.min(10, c.pending.length) })}
+            </p>
+          )}
+        </div>
+      ))}
+
+      <div className="flex flex-wrap items-center gap-2">
+        {plan.steps.length > 0 && (
+          <button
+            onClick={() => {
+              setRoute(plan.steps)
+              navigate('/map')
+            }}
+            className="btn-jade !px-3 !py-1.5 !text-xs"
+          >
+            {t('route.openFullMap')}
+          </button>
+        )}
+        <button onClick={downloadReport} className="panel px-3 py-1.5 text-xs text-ink-mute hover:text-jade">
+          {t('companion.downloadReport')}
+        </button>
+      </div>
+    </div>
   )
 }
 

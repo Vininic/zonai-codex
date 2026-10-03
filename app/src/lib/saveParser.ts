@@ -22,6 +22,9 @@ const H_RUPEES = murmur3('PlayerStatus.CurrentRupee')
 const H_MAX_LIFE = murmur3('PlayerStatus.MaxLife')
 const H_MAX_STAMINA = murmur3('PlayerStatus.MaxStamina')
 const H_MAX_ENERGY = murmur3('PlayerStatus.MaxEnergy')
+/** o dump de hashes da comunidade lista este só como "Playtime (in seconds)",
+ *  sem o nome do campo — por isso é o hash cru em vez de murmur3('...'). */
+const H_PLAYTIME = 0xe573f564
 const H_SAVE_POS = murmur3('PlayerStatus.SavePos')
 
 export interface PlayerPosition {
@@ -41,6 +44,10 @@ export interface PlayerStats {
   batteryCells: number
   maxBatteryCells: number
   position: PlayerPosition | null
+  /** tempo de jogo em segundos — o único jeito confiável de saber qual slot é o
+   *  mais recente (a data do arquivo é igual nos 6 ao extrair do Switch).
+   *  O dump de hashes só traz o hash, não o nome do campo. */
+  playTimeSeconds: number
 }
 
 export interface ParsedSave {
@@ -135,6 +142,7 @@ export function parseSave(buffer: ArrayBuffer): ParsedSave {
     batteryCells: reinterpretF32(values.get(H_MAX_ENERGY) ?? 0) / 1000,
     maxBatteryCells: 48,
     position,
+    playTimeSeconds: values.get(H_PLAYTIME) ?? 0,
   }
 
   return {

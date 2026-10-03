@@ -132,3 +132,30 @@ export function readEquipment(cat: EquipCategory): EquipPouch | null {
 
   return { category: cat, arrays, slots, capacity: arrays.capacity, freeIndices }
 }
+
+/**
+ * Flechas: `Pouch.Arrow` só tem nome + StockNum e em TOTK existe um único tipo
+ * (NormalArrow), então "editor de flechas" é na prática um campo de quantidade.
+ * Devolve null quando não há save na sessão.
+ */
+export function readArrowCount(): number | null {
+  const session = getSessionSave()
+  if (!session) return null
+  const save = parseSave(session.buffer)
+  const namesPtr = save.values.get(murmur3('Pouch.Arrow.Content.Name'))
+  const stockPtr = save.values.get(murmur3('Pouch.Arrow.Content.StockNum'))
+  if (namesPtr === undefined || stockPtr === undefined) return null
+  const dv = new DataView(save.buffer)
+  const bytes = new Uint8Array(save.buffer)
+  const decoder = new TextDecoder()
+  const count = dv.getUint32(namesPtr, true)
+  for (let i = 0; i < count; i++) {
+    const start = namesPtr + 4 + i * 64
+    const slice = bytes.subarray(start, start + 64)
+    const nul = slice.indexOf(0)
+    if (decoder.decode(nul === -1 ? slice : slice.subarray(0, nul)).trim() === 'NormalArrow') {
+      return dv.getUint32(stockPtr + 4 + i * 4, true)
+    }
+  }
+  return 0
+}
