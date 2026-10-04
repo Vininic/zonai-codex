@@ -16,7 +16,7 @@ import { encodeReportState } from '../lib/reportState'
 import { computeProgress } from '../lib/useDataset'
 import { PlanFlow, type FlowStepDef } from '../components/PlanFlow'
 import { RouteArtifact } from '../components/RouteArtifact'
-import { optimizeRoute, type OptimizedRoute } from '../lib/routePlanner'
+import { optimizeRoute, TELEPORT_CATEGORIES, type OptimizedRoute } from '../lib/routePlanner'
 import { useAppStore, type RouteStep } from '../store/appStore'
 
 interface CollectPlan {
@@ -664,7 +664,10 @@ function ReportCard({ plan, groupName }: { plan: ReportPlan; groupName: (id: str
 
   /** o relatório inteiro cabe numa URL: só os bits do que falta (ver reportState) */
   const reportUrl = () => {
-    const ids = [...plan.mapPending.map((g) => g.categoryId), ...plan.checklists.map((c) => c.statId)]
+    // sem saber quais santuarios/torres estao abertos, o planner no celular
+    // acha que nao ha viagem rapida e desenha caminhadas absurdas. 48 chars a
+    // mais no link resolvem.
+    const ids = [...plan.mapPending.map((g) => g.categoryId), ...plan.checklists.map((c) => c.statId), ...TELEPORT_CATEGORIES]
     const d = encodeReportState(data, manual, fromSave, ids)
     return `${location.origin}${location.pathname}#/report?d=${d}`
   }
@@ -772,7 +775,7 @@ function ReportCard({ plan, groupName }: { plan: ReportPlan; groupName: (id: str
           </button>
         )}
         <button
-          onClick={() => navigate(`/report?d=${encodeReportState(data, manual, fromSave, [...plan.mapPending.map((g) => g.categoryId), ...plan.checklists.map((c) => c.statId)])}`)}
+          onClick={() => navigate(`/report?d=${encodeReportState(data, manual, fromSave, [...plan.mapPending.map((g) => g.categoryId), ...plan.checklists.map((c) => c.statId), ...TELEPORT_CATEGORIES])}`)}
           className="btn-jade !px-3 !py-1.5 !text-xs"
         >
           {t('report.openHere')}

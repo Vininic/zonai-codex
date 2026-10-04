@@ -5,7 +5,7 @@ import { useDataset } from '../lib/useDataset'
 import { decodeReportState, encodeReportState } from '../lib/reportState'
 import { categoryMeta } from '../lib/categoryMeta'
 import { itemLabel } from '../lib/itemLabel'
-import { optimizeRoute } from '../lib/routePlanner'
+import { optimizeRoute, TELEPORT_CATEGORIES } from '../lib/routePlanner'
 import { REGIONS, inRegion } from '../lib/regions'
 import type { Progress } from '../store/appStore'
 
@@ -100,6 +100,7 @@ export function ReportPage() {
     }
 
     const mapGroups = decoded.groupIds
+      .filter((gid) => !TELEPORT_CATEGORIES.includes(gid))
       .map((gid) => {
         const cat = data.categories.find((c) => c.id === gid)
         if (!cat) return null
@@ -211,6 +212,21 @@ export function ReportPage() {
     navigator.clipboard?.writeText(`${location.origin}${location.pathname}#/report?d=${d}`)
     setCopied(true)
     setTimeout(() => setCopied(false), 2200)
+  }
+
+  const selectedOrder = selected ? orderOf.get(`${Math.round(selected.x)}|${Math.round(selected.z)}`) : undefined
+
+  /** Seguir a rota e parar na parada N e o uso normal; tickar as 49 anteriores
+   *  uma a uma nao e. Marca tudo com ordem <= n. */
+  function tickUpTo(n: number) {
+    const keys = onLayer.flatMap((g) =>
+      g.items.filter((it) => {
+        const o = orderOf.get(`${Math.round(it.x)}|${Math.round(it.z)}`)
+        return o !== undefined && o <= n
+      }).map((it) => it.key),
+    )
+    setTicked((prev) => new Set([...prev, ...keys]))
+    setSelected(null)
   }
 
   const chip = (on: boolean) => ({
@@ -326,6 +342,11 @@ export function ReportPage() {
               >
                 {ticked.has(selected.key) ? t('report.untick') : t('report.tick')}
               </button>
+              {selectedOrder !== undefined && (
+                <button onClick={() => tickUpTo(selectedOrder)} className="rounded-full border px-3 py-1.5 text-[11px]" style={chip(false)}>
+                  {t('report.tickUpTo', { n: selectedOrder })}
+                </button>
+              )}
               <button onClick={() => setSelected(null)} className="px-2 text-ink-faint">
                 ✕
               </button>

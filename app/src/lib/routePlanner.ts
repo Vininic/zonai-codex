@@ -55,7 +55,7 @@ export interface OptimizedRoute {
 }
 
 /** categorias que funcionam como ponto de viagem rápida quando concluídas */
-const TELEPORT_CATEGORIES = ['shrines', 'towers', 'lightroots']
+export const TELEPORT_CATEGORIES = ['shrines', 'towers', 'lightroots']
 
 const dist = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z)
 
