@@ -8,7 +8,7 @@ import { initReactI18next } from 'react-i18next'
 const resources = {
   en: {
     translation: {
-      nav: { dashboard: 'Home', tracker: 'Tracker', inventory: 'Inventory', map: 'Map', companion: 'Companion', save: 'Save' },
+      nav: { dashboard: 'Home', tracker: 'Tracker', inventory: 'Inventory', map: 'Map', companion: 'Companion', report: 'Report', save: 'Save' },
       dashboard: {
         title: 'Completion',
         overall: 'True 100%',
@@ -218,7 +218,7 @@ const resources = {
       report: {
         title: 'Completion report',
         sub: '{{count}} still missing · rebuilt from the link, no file needed',
-        noLink: 'Open this page from a report link.',
+        noLink: 'No report yet on this device. Ask Purah for one and tap “Open report”.',
         badLink: 'This link was made with a different dataset version — generate a new one.',
         copy: 'Copy phone link',
         copied: 'Link copied',
@@ -227,6 +227,18 @@ const resources = {
         tick: 'Mark as done',
         untick: 'Undo',
         tickUpTo: 'Mark 1–{{n}} done',
+        map: 'Map',
+        collapseAll: 'Collapse all',
+        expandAll: 'Expand all',
+        inList: 'In list',
+        details: 'Details',
+        questsHere: '{{count}} quest(s) here',
+        questsOnMap: 'Quests',
+        giver: 'Given by',
+        where: 'Where',
+        reward: 'Reward',
+        onMap: 'On map',
+        noQuestInfo: 'No details found for this quest.',
         hideDone: 'Hide done',
         warpHere: 'Warp here first',
         copyUpdated: 'Copy link with my progress',
@@ -254,7 +266,7 @@ const resources = {
   },
   pt: {
     translation: {
-      nav: { dashboard: 'Início', tracker: 'Tracker', inventory: 'Inventário', map: 'Mapa', companion: 'Companion', save: 'Save' },
+      nav: { dashboard: 'Início', tracker: 'Tracker', inventory: 'Inventário', map: 'Mapa', companion: 'Companion', report: 'Relatório', save: 'Save' },
       dashboard: {
         title: 'Progresso',
         overall: '100% Real',
@@ -464,7 +476,7 @@ const resources = {
       report: {
         title: 'Relatório de conclusão',
         sub: '{{count}} faltando · remontado do link, sem arquivo',
-        noLink: 'Abra esta página a partir de um link de relatório.',
+        noLink: 'Nenhum relatório neste aparelho ainda. Peça um à Purah e toque em “Abrir relatório”.',
         badLink: 'Este link foi feito com outra versão do dataset — gere um novo.',
         copy: 'Copiar link pro celular',
         copied: 'Link copiado',
@@ -473,6 +485,18 @@ const resources = {
         tick: 'Marcar como feito',
         untick: 'Desfazer',
         tickUpTo: 'Marcar 1–{{n}} como feitos',
+        map: 'Mapa',
+        collapseAll: 'Recolher tudo',
+        expandAll: 'Expandir tudo',
+        inList: 'Ver na lista',
+        details: 'Detalhes',
+        questsHere: '{{count}} quest(s) aqui',
+        questsOnMap: 'Quests',
+        giver: 'Quem dá',
+        where: 'Onde',
+        reward: 'Recompensa',
+        onMap: 'No mapa',
+        noQuestInfo: 'Sem detalhes encontrados pra esta quest.',
         hideDone: 'Esconder feitos',
         warpHere: 'Teleporte aqui antes',
         copyUpdated: 'Copiar link com meu progresso',

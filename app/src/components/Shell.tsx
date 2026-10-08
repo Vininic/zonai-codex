@@ -9,6 +9,7 @@ const NAV = [
   { to: '/inventory', key: 'inventory', icon: PouchIcon },
   { to: '/map', key: 'map', icon: MapIcon },
   { to: '/companion', key: 'companion', icon: EyeIcon },
+  { to: '/report', key: 'report', icon: ReportIcon },
   { to: '/save', key: 'save', icon: SaveIcon },
 ] as const
 
@@ -127,7 +128,7 @@ export function Shell() {
               to={to}
               end={to === '/'}
               className={({ isActive }) =>
-                `flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] uppercase tracking-wider transition-colors ${
+                `flex min-w-0 flex-1 flex-col items-center gap-1 py-2.5 text-[9px] uppercase tracking-wide transition-colors ${
                   isActive ? 'text-jade' : 'text-ink-faint hover:text-ink-mute'
                 }`
               }
@@ -135,7 +136,7 @@ export function Shell() {
               {({ isActive }) => (
                 <>
                   <Icon active={isActive} />
-                  {t(`nav.${key}`)}
+                  <span className="max-w-full truncate px-0.5">{t(`nav.${key}`)}</span>
                 </>
               )}
             </NavLink>
@@ -182,6 +183,15 @@ function MapIcon({ active }: IconProps) {
     <svg width="20" height="20" viewBox="0 0 24 24" {...stroke(active)}>
       <path d="M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10Z" />
       <circle cx="12" cy="11" r="2" fill={active ? 'currentColor' : 'none'} />
+    </svg>
+  )
+}
+function ReportIcon({ active }: IconProps) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" {...stroke(active)}>
+      <rect x="5" y="4" width="14" height="17" rx="1.5" />
+      <path d="M9 4V3h6v1" />
+      <path d="m8.5 11 1.5 1.5 3-3M8.5 16.5h7" />
     </svg>
   )
 }
