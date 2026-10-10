@@ -76,6 +76,10 @@ interface QuestInfo {
   location?: string
   reward?: string
   summary?: string
+  /** passos do Diário de Aventura do jogo; **x** = termo que o jogo destaca */
+  steps?: string[]
+  /** lugares citados nos passos que existem no mapa — pra onde ir, não onde começa */
+  targets?: { name: string; x: number; z: number; layer: string }[]
   x?: number
   z?: number
   layer?: string
@@ -103,6 +107,23 @@ function loadUi(): UiPrefs {
   } catch {
     return { mapOpen: true, hideDone: false, open: {} }
   }
+}
+
+/** "**termo**" vem do vermelho do Diário de Aventura: é o quê/onde da quest */
+function Rich({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+        part.startsWith('**') && part.endsWith('**') ? (
+          <b key={i} className="font-semibold" style={{ color: 'var(--color-gold)' }}>
+            {part.slice(2, -2)}
+          </b>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      )}
+    </>
+  )
 }
 
 const zeldaWikiUrl = (title: string) => `https://zeldawiki.wiki/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`
@@ -383,7 +404,7 @@ function ReportView({ payload }: { payload: string }) {
   return (
     <div className="mx-auto max-w-5xl">
       {/* barra fixa: progresso e os controles que valem pra página inteira */}
-      <div className="sticky top-0 z-20 -mt-1 mb-3 border-b border-edge bg-abyss/95 py-2 backdrop-blur-sm">
+      <div className="sticky top-0 z-20 -mt-1 mb-3 border-b border-edge py-2" style={{ background: 'var(--color-abyss)' }}>
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="mr-auto">
             <span className="block font-display text-base leading-tight">{t('report.title')}</span>
@@ -519,6 +540,19 @@ function ReportView({ payload }: { payload: string }) {
                         </g>
                       )
                     })}
+
+                  {/* destino de quest (pra onde ir, não onde começa): só existe
+                      enquanto selecionado, num alvo com mira */}
+                  {selected?.kind === 'quests' && !questClusters.has(`${selected.x}|${selected.z}`) && (() => {
+                    const [px, py] = toPx(selected.x, selected.z)
+                    return (
+                      <g pointerEvents="none">
+                        <circle cx={px} cy={py} r={34 * k} fill="none" stroke="#ffffff" strokeWidth={5 * k} />
+                        <circle cx={px} cy={py} r={16 * k} fill={QUEST_COLOR} stroke="#0b1210" strokeWidth={4 * k} />
+                        <path d={`M${px - 52 * k} ${py}H${px - 38 * k}M${px + 38 * k} ${py}H${px + 52 * k}M${px} ${py - 52 * k}V${py - 38 * k}M${px} ${py + 38 * k}V${py + 52 * k}`} stroke="#ffffff" strokeWidth={5 * k} />
+                      </g>
+                    )
+                  })()}
                 </svg>
               </div>
 
@@ -553,7 +587,8 @@ function ReportView({ payload }: { payload: string }) {
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm">{selected.place}</span>
                       <span className="font-mono text-[10px] text-ink-faint">
-                        {regionOf(selected.x, selected.z)} · {t('report.questsHere', { count: selected.quests.length })}
+                        {regionOf(selected.x, selected.z) !== '—' && `${regionOf(selected.x, selected.z)} · `}
+                        {t('report.questsHere', { count: selected.quests.length })}
                       </span>
                     </span>
                     <button onClick={() => setSelected(null)} className="px-2 text-ink-faint">
@@ -706,13 +741,47 @@ function ReportView({ payload }: { payload: string }) {
                                     {q.x !== undefined && q.z !== undefined && <span className="text-ink-faint"> · {regionOf(q.x, q.z)}</span>}
                                   </p>
                                 )}
+                                {q.steps && q.steps.length > 0 && (
+                                  <ol className="space-y-1.5 text-ink">
+                                    {q.steps.map((st, si) => (
+                                      <li key={si} className="flex gap-2 leading-relaxed">
+                                        {q.steps!.length > 1 && <span className="shrink-0 font-mono text-[10px] text-ink-faint">{si + 1}.</span>}
+                                        <span className="whitespace-pre-line">
+                                          <Rich text={st} />
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ol>
+                                )}
+                                {q.targets && q.targets.length > 0 && (
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="text-ink-faint">{t('report.goTo')}:</span>
+                                    {q.targets.map((tg) =>
+                                      tg.layer === layer ? (
+                                        <button
+                                          key={tg.name}
+                                          onClick={() => focusMap({ kind: 'quests', x: tg.x, z: tg.z, place: tg.name, quests: [{ key: it.key, sectionId: l.id, label: it.label }] })}
+                                          className={pill}
+                                          style={chip(true)}
+                                        >
+                                          ◆ {tg.name}
+                                          {regionOf(tg.x, tg.z) !== '—' && ` · ${regionOf(tg.x, tg.z)}`}
+                                        </button>
+                                      ) : (
+                                        <span key={tg.name} className="text-[11px]">
+                                          {tg.name} <span className="text-ink-faint">({t(`map.layers.${tg.layer}`)})</span>
+                                        </span>
+                                      ),
+                                    )}
+                                  </div>
+                                )}
                                 {q.reward && (
                                   <p>
                                     <span className="text-ink-faint">{t('report.reward')}: </span>
                                     {q.reward}
                                   </p>
                                 )}
-                                {q.summary && <p className="leading-relaxed text-ink">{q.summary}</p>}
+                                {!q.steps?.length && q.summary && <p className="leading-relaxed text-ink">{q.summary}</p>}
                               </>
                             ) : (
                               <p className="text-ink-faint">{t('report.noQuestInfo')}</p>
@@ -727,7 +796,7 @@ function ReportView({ payload }: { payload: string }) {
                                   className={pill}
                                   style={chip(false)}
                                 >
-                                  {t('report.onMap')}
+                                  {t('report.startOnMap')}
                                 </button>
                               )}
                               <a href={zeldaDungeonUrl(it.label)} target="_blank" rel="noreferrer" className={pill} style={chip(false)}>
